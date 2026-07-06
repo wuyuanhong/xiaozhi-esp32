@@ -173,11 +173,13 @@ void CustomLcdDisplay::SetupWeatherUI() {
     lv_obj_center(date_num_label_);
     lv_label_set_text(date_num_label_, "--");
 
-    // 天气标签
+    // 天气标签（用 font_puhui_16_4 完整字库，支持更多城市名）
     weather_label_ = lv_label_create(calendar_card);
-    lv_obj_set_style_text_font(weather_label_, font_small, 0);
+    lv_obj_set_style_text_font(weather_label_, &font_puhui_16_4, 0);
     lv_obj_set_style_text_color(weather_label_, lv_color_white(), 0);
     lv_obj_set_style_text_align(weather_label_, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_width(weather_label_, right_w - 10);
+    lv_label_set_long_mode(weather_label_, LV_LABEL_LONG_DOT);
     lv_obj_align(weather_label_, LV_ALIGN_BOTTOM_MID, 0, -6);
     lv_label_set_text(weather_label_, "-- --°C");
 

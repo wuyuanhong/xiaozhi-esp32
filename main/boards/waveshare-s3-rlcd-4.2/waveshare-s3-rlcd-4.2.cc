@@ -239,18 +239,18 @@ private:
 
     void RefreshAllData() {
         ESP_LOGI(TAG, "手动刷新所有数据...");
-        
-        // 暂时停用板载和风天气拉取，天气请通过 MCP 工具 self.weather.update 刷新
-        // WeatherManager::getInstance().update();
-        
+
         // 重新同步 NTP 时间
         SensorManager::getInstance().syncNtpTime();
-        
+
+        // 重新获取天气
+        WeatherManager::getInstance().update();
+
         // 强制刷新屏幕显示
         if (display_) {
-            display_->SetChatMessage("system", "正在刷新数据...\n时间已更新，天气等待 MCP 同步");
+            display_->SetChatMessage("system", "正在刷新数据...\n时间和天气已更新");
         }
-        
+
         ESP_LOGI(TAG, "数据刷新完成");
     }
 
@@ -311,8 +311,9 @@ private:
 
         // ===== 天气写入工具（由 AI 侧 MCP 查询后回写到设备）=====
         mcp_server.AddTool("self.weather.update",
-            "Write weather data to the device screen cache.\n"
-            "Use this after AI gets weather from an external MCP/weather source.\n"
+            "Write weather data to the device screen and update display.\n"
+            "IMPORTANT: You MUST call this tool EVERY TIME you report weather to the user.\n"
+            "When user asks about weather, always: 1) Get weather data 2) Call this tool 3) Reply to user.\n"
             "Args:\n"
             "  `city`: City name (e.g. '苏州')\n"
             "  `text`: Weather text (e.g. '晴', '多云', '小雨')\n"

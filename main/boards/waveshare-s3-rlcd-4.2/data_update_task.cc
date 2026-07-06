@@ -40,12 +40,12 @@ LV_IMAGE_DECLARE(ui_img_battery_charging);
 static const char *TAG = "DataUpdate";
 
 void CustomLcdDisplay::StartDataUpdateTask() {
-    // 暂时停用板载和风天气 API 配置，改为由 MCP 工具写入天气缓存
-    // WeatherManager::getInstance().setApiConfig(
-    //     WEATHER_API_KEY,
-    //     WEATHER_API_HOST
-    // );
-    
+    // 启用和风天气 API 配置
+    WeatherManager::getInstance().setApiConfig(
+        WEATHER_API_KEY,
+        WEATHER_API_HOST
+    );
+
     // 栈从 16KB 下调到 8KB，给音频/MQTT 留更多 SRAM 余量
     // 优先级保持较低，避免与语音收发实时链路抢占 CPU
     xTaskCreate(DataUpdateTask, "weather_ui_update", 8192, this, 2, &update_task_handle_);
@@ -54,21 +54,28 @@ void CustomLcdDisplay::StartDataUpdateTask() {
 void CustomLcdDisplay::DataUpdateTask(void *arg) {
     CustomLcdDisplay *self = (CustomLcdDisplay *)arg;
     bool time_synced = false;
-    
+
     // NTP 指数退避重试参数
     int ntp_retry_count = 0;
     const int NTP_MAX_RETRIES = 5;            // 最多重试 5 次后放弃
     uint32_t ntp_retry_delay_ms = 1000;       // 初始延迟 1 秒，每次翻倍（1s, 2s, 4s, 8s, 16s）
     uint32_t ntp_last_sync_ms = 0;            // 上次 NTP 同步成功的时间（用于 24 小时校准）
     const uint32_t NTP_RESYNC_INTERVAL = 24 * 60 * 60 * 1000;  // 24 小时（毫秒）
-    
+
+    // 天气更新参数
+    bool weather_fetched = false;             // 是否已成功获取过天气
+    int weather_retry_count = 0;
+    const int WEATHER_MAX_RETRIES = 3;       // 最多重试 3 次
+    uint32_t weather_last_sync_ms = 0;
+    const uint32_t WEATHER_RESYNC_INTERVAL = 30 * 60 * 1000;  // 30 分钟刷新一次
+
     // 电池电量变化很慢，降频采样可显著减轻 ADC 和 UI 刷新压力
     const uint32_t BATTERY_POLL_INTERVAL = 10 * 1000;           // 每 10 秒采样一次
     uint32_t last_battery_poll_ms = 0;
     int cached_battery_level = 0;
     bool cached_charging = false, cached_discharging = false;
     bool battery_cached = false;
-    
+
     // 等待一会让系统启动完成
     vTaskDelay(pdMS_TO_TICKS(3000));
     
@@ -163,8 +170,36 @@ void CustomLcdDisplay::DataUpdateTask(void *arg) {
             }
         }
         
-        // ===== 天气更新 =====
-        // 暂时停用板载和风天气自动拉取，天气由 AI 通过 MCP 主动写入
+        // ===== 天气更新（启动后自动拉取，之后每 30 分钟刷新）=====
+        if (network_connected && idle_long_enough) {
+            bool should_update_weather = false;
+
+            if (!weather_fetched && weather_retry_count < WEATHER_MAX_RETRIES) {
+                // 首次获取：未获取成功且未超过最大重试次数
+                should_update_weather = true;
+            } else if (weather_fetched && weather_last_sync_ms > 0 &&
+                       (now_ms - weather_last_sync_ms > WEATHER_RESYNC_INTERVAL)) {
+                // 定期刷新：已获取成功但超过 30 分钟
+                should_update_weather = true;
+            }
+
+            if (should_update_weather) {
+                ESP_LOGI(TAG, "自动获取天气数据 (第 %d 次)...", weather_retry_count + 1);
+                if (WeatherManager::getInstance().update()) {
+                    weather_fetched = true;
+                    weather_retry_count = 0;
+                    weather_last_sync_ms = now_ms;
+                    ESP_LOGI(TAG, "天气自动更新成功");
+                } else {
+                    weather_retry_count++;
+                    ESP_LOGW(TAG, "天气获取失败，第 %d/%d 次", weather_retry_count, WEATHER_MAX_RETRIES);
+                    if (weather_retry_count >= WEATHER_MAX_RETRIES) {
+                        ESP_LOGE(TAG, "天气获取已失败 %d 次，等待 30 分钟后重试", WEATHER_MAX_RETRIES);
+                        weather_last_sync_ms = now_ms;  // 30 分钟后再试
+                    }
+                }
+            }
+        }
         
         // ===== 时间获取（在锁外也需要用，所以先获取）=====
         time_t now;

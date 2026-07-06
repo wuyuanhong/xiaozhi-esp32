@@ -1323,6 +1323,10 @@ void Application::MusicPlaybackTask(std::string url, std::string title, std::str
     auto http = network->CreateHttp(3);
     do {
         http->SetHeader("User-Agent", SystemInfo::GetUserAgent());
+        // QQ 音乐 CDN 防盗链：需要 Referer 头才能获取 MP3 流
+        if (url.find("qqmusic") != std::string::npos || url.find("qq.com") != std::string::npos) {
+            http->SetHeader("Referer", "https://y.qq.com/");
+        }
 
         if (!http->Open("GET", url)) {
             ESP_LOGE(TAG, "播放音乐失败：无法打开 URL: %s", url.c_str());
