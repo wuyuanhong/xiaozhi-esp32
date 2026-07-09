@@ -185,17 +185,21 @@ void CustomLcdDisplay::RefreshMemoDisplay() {
 void CustomLcdDisplay::SetChatMessage(const char* role, const char* content) {
     DisplayLockGuard lock(this);
     if (chat_status_label_ == nullptr && music_chat_status_label_ == nullptr) return;
-    if (!content || strlen(content) == 0) return;
+    if (!content) content = "";
 
     // 停止可能正在运行的滚动动画（系统信息或之前的 AI 滚动）
-    lv_anim_delete(chat_status_label_, nullptr);
+    if (chat_status_label_) {
+        lv_anim_delete(chat_status_label_, nullptr);
+    }
     
     // 停止系统信息滚动，恢复 DataUpdateTask 更新
     SetShowingSystemInfo(false);
     
     // 设置文本内容
-    lv_label_set_text(chat_status_label_, content);
-    lv_label_set_long_mode(chat_status_label_, LV_LABEL_LONG_WRAP);
+    if (chat_status_label_) {
+        lv_label_set_text(chat_status_label_, content);
+        lv_label_set_long_mode(chat_status_label_, LV_LABEL_LONG_WRAP);
+    }
     
     // 先恢复居中对齐（正常模式），计算内容高度
     lv_obj_align(chat_status_label_, LV_ALIGN_LEFT_MID, 64 + 20, 0);

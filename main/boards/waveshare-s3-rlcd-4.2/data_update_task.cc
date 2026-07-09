@@ -27,6 +27,7 @@
 #include "managers/weather_manager.h"
 #include "managers/pomodoro_manager.h"
 #include "secret_config.h"
+#include <wifi_manager.h>
 
 // 声明状态栏图标（DataUpdateTask 需要更新图标）
 LV_IMAGE_DECLARE(ui_img_wifi);
@@ -437,13 +438,27 @@ void CustomLcdDisplay::DataUpdateTask(void *arg) {
                     }
                 }
 
-                // 5. WiFi 图标更新（状态变化时才更新）
-                static DeviceState last_wifi_state = kDeviceStateUnknown;
-                if (ds != last_wifi_state) {
+                // 5. WiFi 图标更新（根据真实 Wi-Fi 状态变化时才更新）
+                static enum class WifiIconState {
+                    Unknown,
+                    Disconnected,
+                    Connected,
+                    Configuring,
+                } last_wifi_state = WifiIconState::Unknown;
+
+                auto& wifi_manager = WifiManager::GetInstance();
+                WifiIconState wifi_state = WifiIconState::Disconnected;
+                if (wifi_manager.IsConfigMode()) {
+                    wifi_state = WifiIconState::Configuring;
+                } else if (wifi_manager.IsConnected()) {
+                    wifi_state = WifiIconState::Connected;
+                }
+
+                if (wifi_state != last_wifi_state) {
                     const void* wifi_src = &ui_img_wifi_off;
-                    if (ds != kDeviceStateStarting && ds != kDeviceStateWifiConfiguring) {
+                    if (wifi_state == WifiIconState::Connected) {
                         wifi_src = &ui_img_wifi;
-                    } else if (ds == kDeviceStateWifiConfiguring) {
+                    } else if (wifi_state == WifiIconState::Configuring) {
                         wifi_src = &ui_img_wifi_low;
                     }
                     if (self->wifi_icon_img_) {
@@ -455,7 +470,7 @@ void CustomLcdDisplay::DataUpdateTask(void *arg) {
                     if (self->pomo_wifi_icon_img_) {
                         lv_image_set_src(self->pomo_wifi_icon_img_, wifi_src);
                     }
-                    last_wifi_state = ds;
+                    last_wifi_state = wifi_state;
                 }
             }
 

@@ -189,25 +189,15 @@ void LvglDisplay::UpdateStatusBar(bool update_all) {
         }
     }
 
-    // Update network icon every 10 seconds
+    // Update network icon every 10 seconds or immediately on a network event.
+    // The Wi-Fi icon should reflect disconnect/reconnect state even while the device is busy.
     static int seconds_counter = 0;
     if (update_all || seconds_counter++ % 10 == 0) {
-        // Don't read 4G network status during firmware upgrade to avoid occupying UART resources
-        auto device_state = Application::GetInstance().GetDeviceState();
-        static const std::vector<DeviceState> allowed_states = {
-            kDeviceStateIdle,
-            kDeviceStateStarting,
-            kDeviceStateWifiConfiguring,
-            kDeviceStateListening,
-            kDeviceStateActivating,
-        };
-        if (std::find(allowed_states.begin(), allowed_states.end(), device_state) != allowed_states.end()) {
-            icon = board.GetNetworkStateIcon();
-            if (network_label_ != nullptr && icon != nullptr && network_icon_ != icon) {
-                DisplayLockGuard lock(this);
-                network_icon_ = icon;
-                lv_label_set_text(network_label_, network_icon_);
-            }
+        icon = board.GetNetworkStateIcon();
+        if (network_label_ != nullptr && icon != nullptr && network_icon_ != icon) {
+            DisplayLockGuard lock(this);
+            network_icon_ = icon;
+            lv_label_set_text(network_label_, network_icon_);
         }
     }
 

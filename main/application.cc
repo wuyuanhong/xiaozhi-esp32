@@ -169,6 +169,8 @@ void Application::Initialize() {
                 display->SetStatus(Lang::Strings::REGISTERING_NETWORK);
                 break;
         }
+
+        display->UpdateStatusBar(true);
     });
 
     // Start network asynchronously
