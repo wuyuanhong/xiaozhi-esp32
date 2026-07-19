@@ -99,6 +99,11 @@ private:
                 EnterWifiConfigMode();
                 return;
             }
+            // 股票页时：切换到下一只股票
+            if (display_ && display_->IsStockMode()) {
+                display_->SwitchToNextStock();
+                return;
+            }
             app.ToggleChatState();
         });
 

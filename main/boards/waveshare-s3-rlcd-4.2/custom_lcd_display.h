@@ -34,14 +34,24 @@ private:
         MODE_WEATHER = 0,
         MODE_MUSIC = 1,
         MODE_POMODORO = 2,
+        MODE_STOCK = 3,
     };
     DisplayMode display_mode_ = MODE_WEATHER;
+
+    // 股票列表常量和结构
+    static const int STOCK_MAX_COUNT = 10;
+    struct StockInfo {
+        const char* code;
+        const char* name;
+    };
 
     // RLCD 硬件驱动（独立模块，负责 SPI 通信和像素操作）
     RlcdDriver *rlcd_ = nullptr;
     lv_obj_t *weather_page_ = nullptr;
     lv_obj_t *music_page_ = nullptr;
     lv_obj_t *pomodoro_page_ = nullptr;
+    lv_obj_t *stock_page_ = nullptr;
+    lv_obj_t *stock_list_items_[STOCK_MAX_COUNT] = {};  // 列表项 label
 
     // ===== 天气站 UI 组件 =====
     // 状态栏（右上角浮动胶囊）
@@ -90,6 +100,20 @@ private:
     lv_obj_t *pomo_battery_icon_img_ = nullptr;  // 状态栏电池图标
     lv_obj_t *pomo_battery_pct_label_ = nullptr; // 状态栏电量文字
 
+    // ===== 股票页 UI 组件 =====
+    lv_obj_t *stock_index_top_label_ = nullptr;   // 顶部指数栏（上证+深证）
+    lv_obj_t *stock_name_label_ = nullptr;        // 股票名称+代码
+    lv_obj_t *stock_price_label_ = nullptr;       // 当前价格+涨跌幅
+    lv_obj_t *stock_info_label_ = nullptr;        // 今开/昨收
+    lv_obj_t *stock_high_low_label_ = nullptr;    // 最高/最低
+    lv_obj_t *stock_amount_label_ = nullptr;      // 成交额
+    lv_obj_t *stock_change_label_ = nullptr;      // 涨跌额
+    lv_obj_t *stock_index_bottom_label_ = nullptr;// 底部创业板指
+    // 股票列表管理
+    StockInfo stock_list_[STOCK_MAX_COUNT];
+    int stock_list_count_ = 0;
+    int stock_current_index_ = 0;
+
     // 图片图标（不能用基类的 label，因为我们用 lv_image 而不是 Font Awesome 文字）
     lv_obj_t *wifi_icon_img_ = nullptr;
     lv_obj_t *battery_icon_img_ = nullptr;
@@ -120,10 +144,11 @@ private:
     // LVGL flush 回调（将 RGB565 转换为 1-bit 并刷新到 RLCD）
     static void Lvgl_flush_cb(lv_display_t * disp, const lv_area_t * area, uint8_t * color_p);
 
-    // UI 创建（实现在 weather_ui.cc / music_ui.cc / pomodoro_ui.cc）
+    // UI 创建（实现在 weather_ui.cc / music_ui.cc / pomodoro_ui.cc / stock_ui.cc）
     void SetupWeatherUI();
     void SetupMusicUI();
     void SetupPomodoroUI();
+    void SetupStockUI();
     void ApplyDisplayMode();
     
     // 备忘录
@@ -176,7 +201,19 @@ public:
     void CycleDisplayMode();
     bool IsMusicMode() const { return display_mode_ == MODE_MUSIC; }
     bool IsPomodoroMode() const { return display_mode_ == MODE_POMODORO; }
+    bool IsStockMode() const { return display_mode_ == MODE_STOCK; }
     void SwitchToPomodoroPage();
+
+    // 股票页方法
+    void SwitchToStockPage();
+    void SwitchToNextStock();
+    void AddStock(const char* code, const char* name);
+    void UpdateStockLabels(int index, float price, float change_pct,
+                           float open, float pre_close, float high, float low,
+                           float amount);
+    void UpdateStockIndexLabels(float sh_index, float sh_change,
+                                float sz_index, float sz_change,
+                                float cy_index, float cy_change);
 
     // 番茄钟 UI 更新方法
     void UpdatePomodoroDisplay(const char* state_text, const char* countdown_text,

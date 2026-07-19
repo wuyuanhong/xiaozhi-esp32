@@ -21,3 +21,5 @@ mmap_generate_*.h
 
 # 敏感配置文件（密钥等），只提交 .example 模板
 secret_config.h
+.mimocode/
+sdkconfig.oild1

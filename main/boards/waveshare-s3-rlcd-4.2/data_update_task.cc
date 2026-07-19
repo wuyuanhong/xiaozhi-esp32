@@ -245,6 +245,7 @@ void CustomLcdDisplay::DataUpdateTask(void *arg) {
                 if (self->time_label_) lv_label_set_text(self->time_label_, time_buf);
                 if (self->music_time_label_) lv_label_set_text(self->music_time_label_, time_buf);
                 if (self->pomo_time_label_) lv_label_set_text(self->pomo_time_label_, time_buf);
+                // 股票页时钟由系统状态栏自动显示，不需要单独更新
 
                 const char *weeks_en[] = {"SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"};
                 if (self->day_label_) lv_label_set_text(self->day_label_, weeks_en[timeinfo.tm_wday]);
@@ -471,6 +472,235 @@ void CustomLcdDisplay::DataUpdateTask(void *arg) {
                         lv_image_set_src(self->pomo_wifi_icon_img_, wifi_src);
                     }
                     last_wifi_state = wifi_state;
+                }
+            }
+
+            // 7. 股票数据更新（腾讯财经 API）
+            static uint32_t stock_last_sync_ms = 0;
+            const uint32_t STOCK_RESYNC_TRADING = 30 * 1000;    // 交易时间 30 秒
+            const uint32_t STOCK_RESYNC_IDLE = 5 * 60 * 1000;  // 非交易时间 5 分钟
+
+            // 判断是否在交易时间（9:30-11:30, 13:00-15:00）
+            bool is_trading = false;
+            if (time_synced) {
+                int hour = timeinfo.tm_hour;
+                int min = timeinfo.tm_min;
+                int weekday = timeinfo.tm_wday;
+                if (weekday >= 1 && weekday <= 5) {  // 周一到周五
+                    int t = hour * 60 + min;
+                    if ((t >= 570 && t <= 710) || (t >= 780 && t <= 900)) {  // 9:30-11:30, 13:00-15:00
+                        is_trading = true;
+                    }
+                }
+            }
+
+            uint32_t stock_interval = is_trading ? STOCK_RESYNC_TRADING : STOCK_RESYNC_IDLE;
+            if (network_connected && idle_long_enough && time_synced &&
+                (now_ms - stock_last_sync_ms >= stock_interval)) {
+
+                // 腾讯财经 API 请求
+                // 指数：sh000001(上证), sz399001(深证), sz399006(创业板)
+                // 自选股：sh600519, sz000001, sh601318, sz300750, sz002594
+                const char* url = "http://qt.gtimg.cn/q=sh000001,sz399001,sz399006,sh600519,sz000001,sh601318,sz300750,sz002594";
+
+                esp_http_client_config_t config = {
+                    .url = url,
+                    .timeout_ms = 5000,
+                };
+                esp_http_client_handle_t client = esp_http_client_init(&config);
+                if (client) {
+                    esp_err_t err = esp_http_client_open(client, 0);
+                    if (err == ESP_OK) {
+                        int content_length = esp_http_client_fetch_headers(client);
+                        int status = esp_http_client_get_status_code(client);
+                        if (status == 200 && content_length > 0) {
+                            char* response = (char*)malloc(content_length + 1);
+                            if (response) {
+                                int read = esp_http_client_read(client, response, content_length);
+                                response[read] = '\0';
+
+                                // 解析腾讯财经数据
+                                // 格式：v_sh000001="1~上证指数~000001~3350.20~3322.66~..."
+                                // 字段：[1]名称 [3]当前价 [4]昨收 [5]今开 [31]涨跌额 [32]涨跌幅
+
+                                float sh_index = 0, sh_change = 0;
+                                float sz_index = 0, sz_change = 0;
+                                float cy_index = 0, cy_change = 0;
+
+                                // 简单解析
+                                char* p = response;
+                                while (*p) {
+                                    // 找到 v_sh 或 v_sz 开头
+                                    if (strncmp(p, "v_sh000001", 11) == 0) {
+                                        // 上证指数
+                                        char* q = strchr(p, '"');
+                                        if (q) {
+                                            q++;
+                                            // 跳过字段到 [3] 当前价
+                                            for (int i = 0; i < 3 && q; i++) {
+                                                q = strchr(q, '~');
+                                                if (q) q++;
+                                            }
+                                            if (q) sh_index = atof(q);
+                                            // 找到 [32] 涨跌幅
+                                            q = strchr(p, '"');
+                                            if (q) {
+                                                for (int i = 0; i < 32 && q; i++) {
+                                                    q = strchr(q, '~');
+                                                    if (q) q++;
+                                                }
+                                                if (q) sh_change = atof(q);
+                                            }
+                                        }
+                                    } else if (strncmp(p, "v_sz399001", 11) == 0) {
+                                        // 深证成指
+                                        char* q = strchr(p, '"');
+                                        if (q) {
+                                            q++;
+                                            for (int i = 0; i < 3 && q; i++) {
+                                                q = strchr(q, '~');
+                                                if (q) q++;
+                                            }
+                                            if (q) sz_index = atof(q);
+                                            q = strchr(p, '"');
+                                            if (q) {
+                                                for (int i = 0; i < 32 && q; i++) {
+                                                    q = strchr(q, '~');
+                                                    if (q) q++;
+                                                }
+                                                if (q) sz_change = atof(q);
+                                            }
+                                        }
+                                    } else if (strncmp(p, "v_sz399006", 11) == 0) {
+                                        // 创业板指
+                                        char* q = strchr(p, '"');
+                                        if (q) {
+                                            q++;
+                                            for (int i = 0; i < 3 && q; i++) {
+                                                q = strchr(q, '~');
+                                                if (q) q++;
+                                            }
+                                            if (q) cy_index = atof(q);
+                                            q = strchr(p, '"');
+                                            if (q) {
+                                                for (int i = 0; i < 32 && q; i++) {
+                                                    q = strchr(q, '~');
+                                                    if (q) q++;
+                                                }
+                                                if (q) cy_change = atof(q);
+                                            }
+                                        }
+                                    }
+                                    p++;
+                                }
+
+                                // 更新指数标签
+                                DisplayLockGuard lock(self);
+                                self->UpdateStockIndexLabels(sh_index, sh_change, sz_index, sz_change, cy_index, cy_change);
+
+                                // 解析自选股数据并更新
+                                // 股票数据格式类似，但需要根据 code 匹配
+                                p = response;
+                                while (*p) {
+                                    if (strncmp(p, "v_sh600519", 11) == 0 ||
+                                        strncmp(p, "v_sz000001", 11) == 0 ||
+                                        strncmp(p, "v_sh601318", 11) == 0 ||
+                                        strncmp(p, "v_sz300750", 11) == 0 ||
+                                        strncmp(p, "v_sz002594", 11) == 0) {
+                                        char code[16] = {0};
+                                        if (strncmp(p, "v_sh", 4) == 0) {
+                                            code[0] = 's'; code[1] = 'h';
+                                            strncpy(code + 2, p + 4, 6);
+                                        } else {
+                                            code[0] = 's'; code[1] = 'z';
+                                            strncpy(code + 2, p + 4, 6);
+                                        }
+                                        code[8] = '\0';
+
+                                        char* q = strchr(p, '"');
+                                        if (q) {
+                                            q++;
+                                            // [3] 当前价
+                                            for (int i = 0; i < 3 && q; i++) {
+                                                q = strchr(q, '~');
+                                                if (q) q++;
+                                            }
+                                            float price = q ? atof(q) : 0;
+                                            // [4] 昨收
+                                            q = strchr(p, '"');
+                                            if (q) {
+                                                for (int i = 0; i < 4 && q; i++) {
+                                                    q = strchr(q, '~');
+                                                    if (q) q++;
+                                                }
+                                            }
+                                            float pre_close = q ? atof(q) : 0;
+                                            // [5] 今开
+                                            q = strchr(p, '"');
+                                            if (q) {
+                                                for (int i = 0; i < 5 && q; i++) {
+                                                    q = strchr(q, '~');
+                                                    if (q) q++;
+                                                }
+                                            }
+                                            float open = q ? atof(q) : 0;
+                                            // [33] 最高
+                                            q = strchr(p, '"');
+                                            if (q) {
+                                                for (int i = 0; i < 33 && q; i++) {
+                                                    q = strchr(q, '~');
+                                                    if (q) q++;
+                                                }
+                                            }
+                                            float high = q ? atof(q) : 0;
+                                            // [34] 最低
+                                            q = strchr(p, '"');
+                                            if (q) {
+                                                for (int i = 0; i < 34 && q; i++) {
+                                                    q = strchr(q, '~');
+                                                    if (q) q++;
+                                                }
+                                            }
+                                            float low = q ? atof(q) : 0;
+                                            // [37] 成交额（万元）
+                                            q = strchr(p, '"');
+                                            if (q) {
+                                                for (int i = 0; i < 37 && q; i++) {
+                                                    q = strchr(q, '~');
+                                                    if (q) q++;
+                                                }
+                                            }
+                                            float amount = q ? atof(q) : 0;
+                                            // [32] 涨跌幅
+                                            q = strchr(p, '"');
+                                            if (q) {
+                                                for (int i = 0; i < 32 && q; i++) {
+                                                    q = strchr(q, '~');
+                                                    if (q) q++;
+                                                }
+                                            }
+                                            float change_pct = q ? atof(q) : 0;
+
+                                            // 找到对应股票索引并更新
+                                            DisplayLockGuard lock(self);
+                                            for (int i = 0; i < self->stock_list_count_; i++) {
+                                                if (strcmp(self->stock_list_[i].code, code) == 0) {
+                                                    self->UpdateStockLabels(i, price, change_pct, open, pre_close, high, low, amount);
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    p++;
+                                }
+
+                                free(response);
+                            }
+                        }
+                        esp_http_client_close(client);
+                    }
+                    esp_http_client_cleanup(client);
+                    stock_last_sync_ms = now_ms;
                 }
             }
 
