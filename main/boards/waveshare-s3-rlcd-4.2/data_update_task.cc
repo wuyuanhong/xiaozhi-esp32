@@ -523,9 +523,9 @@ void CustomLcdDisplay::DataUpdateTask(void *arg) {
                                 // 格式：v_sh000001="1~上证指数~000001~3350.20~3322.66~..."
                                 // 字段：[1]名称 [3]当前价 [4]昨收 [5]今开 [31]涨跌额 [32]涨跌幅
 
-                                float sh_index = 0, sh_change = 0;
-                                float sz_index = 0, sz_change = 0;
-                                float cy_index = 0, cy_change = 0;
+                                static float sh_index = 0, sh_change = 0;
+                                static float sz_index = 0, sz_change = 0;
+                                static float cy_index = 0, cy_change = 0;
 
                                 // 简单解析
                                 char* p = response;
@@ -692,6 +692,22 @@ void CustomLcdDisplay::DataUpdateTask(void *arg) {
                                         }
                                     }
                                     p++;
+                                }
+
+                                // === 报警检测 ===
+                                // 只在空闲状态才报警（避免打断 AI 对话或音乐）
+                                if (ds == kDeviceStateIdle) {
+                                    const float INDEX_ALERT_THRESHOLD = 1.0f;   // 指数：1%
+                                    const uint32_t ALERT_COOLDOWN_MS = 10 * 60 * 1000;  // 10分钟冷却
+                                    static uint32_t last_index_alert_ms = 0;
+
+                                    // 检查上证/深证报警
+                                    if ((fabsf(sh_change) >= INDEX_ALERT_THRESHOLD || fabsf(sz_change) >= INDEX_ALERT_THRESHOLD) &&
+                                        (now_ms - last_index_alert_ms > ALERT_COOLDOWN_MS)) {
+                                        ESP_LOGW(TAG, "报警：指数涨跌 上证%.2f%% 深证%.2f%%", sh_change, sz_change);
+                                        app.PlaySound(Lang::Sounds::OGG_LOW_BATTERY);
+                                        last_index_alert_ms = now_ms;
+                                    }
                                 }
 
                                 free(response);
