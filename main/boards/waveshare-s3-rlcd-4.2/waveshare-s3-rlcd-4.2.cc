@@ -107,6 +107,22 @@ private:
             app.ToggleChatState();
         });
 
+        boot_button_.OnLongPress([this]() {
+            if (display_) display_->NotifyUserActivity();
+            // 股票页时：强制刷新数据
+            if (display_ && display_->IsStockMode()) {
+                display_->ForceRefreshStock();
+                ESP_LOGI(TAG, "BOOT 长按：强制刷新股票数据");
+                // 视觉反馈：在AI状态区显示"刷新中..."
+                auto* label = display_->GetChatStatusLabel();
+                if (label) {
+                    lv_label_set_text(label, "刷新中...");
+                    lv_obj_remove_flag(label, LV_OBJ_FLAG_HIDDEN);
+                }
+                return;
+            }
+        });
+
         // USER 按钮（GPIO18）- 辅助功能按键
         user_button_.OnClick([this]() {
             if (display_) display_->NotifyUserActivity();  // 记录用户活动

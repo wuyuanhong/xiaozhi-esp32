@@ -485,8 +485,9 @@ void CustomLcdDisplay::DataUpdateTask(void *arg) {
             // 7. 股票数据更新（腾讯财经 API）
             static uint32_t stock_last_sync_ms = 0;
             static bool stock_was_visible = false;
-            const uint32_t STOCK_RESYNC_TRADING = 30 * 1000;    // 交易时间 30 秒
-            const uint32_t STOCK_RESYNC_IDLE = 5 * 60 * 1000;  // 非交易时间 5 分钟
+            static bool was_trading = false;
+            const uint32_t STOCK_RESYNC_TRADING = 30 * 1000;     // 交易时间 30 秒
+            const uint32_t STOCK_RESYNC_NON_TRADING = 30 * 60 * 1000;  // 非交易时间 30 分钟
 
             // 切换到股票页时立即获取一次数据（不等间隔）
             bool stock_visible = self->IsStockMode();
@@ -495,7 +496,13 @@ void CustomLcdDisplay::DataUpdateTask(void *arg) {
             }
             stock_was_visible = stock_visible;
 
-            // 判断是否在交易时间（9:30-11:30, 13:00-15:00）
+            // 强制刷新（长按BOOT按钮触发）
+            if (self->force_stock_refresh_) {
+                stock_last_sync_ms = 0;
+                self->force_stock_refresh_ = false;
+            }
+
+            // 判断是否在交易时间（9:30-11:30, 13:00-15:30）
             bool is_trading = false;
             if (time_synced) {
                 int hour = timeinfo.tm_hour;
@@ -503,13 +510,19 @@ void CustomLcdDisplay::DataUpdateTask(void *arg) {
                 int weekday = timeinfo.tm_wday;
                 if (weekday >= 1 && weekday <= 5) {  // 周一到周五
                     int t = hour * 60 + min;
-                    if ((t >= 570 && t <= 710) || (t >= 780 && t <= 900)) {  // 9:30-11:30, 13:00-15:00
+                    if ((t >= 570 && t <= 710) || (t >= 780 && t <= 930)) {  // 9:30-11:30, 13:00-15:30
                         is_trading = true;
                     }
                 }
+
+                // 开盘时刻（9:30 或 13:00）立即刷新
+                if (is_trading && !was_trading) {
+                    stock_last_sync_ms = 0;
+                }
+                was_trading = is_trading;
             }
 
-            uint32_t stock_interval = is_trading ? STOCK_RESYNC_TRADING : STOCK_RESYNC_IDLE;
+            uint32_t stock_interval = is_trading ? STOCK_RESYNC_TRADING : STOCK_RESYNC_NON_TRADING;
 
             // 调试日志：显示股票数据获取的各个条件状态
             static uint32_t last_stock_debug_ms = 0;

@@ -283,3 +283,37 @@ idf.py -p COM9 monitor
 - **SK海力士**（美股）无法通过 A 股 API 获取
 - **换手率字段** [38] 对 ETF 可能不准确，需验证
 - 8 只股票 + 基类占位控件，LVGL 对象数较多，需关注内存
+
+### 8. 按键功能最终版
+
+| 按键 | 操作 | 股票页行为 | 其他页行为 |
+|------|------|-----------|-----------|
+| BOOT 短按 | 切换股票 | 选中下一只 | 唤醒小智 |
+| BOOT 长按 | 强制刷新 | 立即刷新数据，显示"刷新中..." | 无操作 |
+| USER 短按 | 切换页面 | 四页循环 | 同左 |
+| USER 双击 | 刷新数据 | 刷新天气等 | 同左 |
+| USER 长按 | 系统信息 | 显示系统信息滚动 | 同左 |
+
+### 9. 刷新策略
+
+| 时间段 | 间隔 | 说明 |
+|--------|------|------|
+| 周一至周五 9:30-11:30 | 30秒 | 上午交易时间 |
+| 周一至周五 13:00-15:30 | 30秒 | 下午交易时间 |
+| 其他时间 | 30分钟 | 盘前盘后/周末 |
+
+**触发立即刷新的场景：**
+- 切换到股票页时
+- BOOT 长按（显示"刷新中..."反馈）
+- 9:30 或 13:00 开盘时刻自动刷新
+
+### 10. 文件修改清单（更新）
+
+| 文件 | 修改内容 |
+|------|----------|
+| `stock_ui.cc` | 完全重写（卡片版布局、8只股票、双标签左名称右价格+涨跌箭头、状态栏白色胶囊） |
+| `custom_lcd_display.h` | 新增 `stock_price_items_[]`、`stock_amplitude_label_`、`stock_turnover_label_`、`force_stock_refresh_`；`StockInfo` 增加全部行情字段；`UpdateStockLabels` 增加 turnover 参数 |
+| `custom_lcd_display.cc` | 页面顺序改为天气→股票→音乐→番茄钟；`SwitchToNextStock` 增加右侧刷新和双标签高亮；`UpdateStockLabels` 增加振幅/换手显示；`UpdateStockIndexLabels` 增加科创50；新增 `ForceRefreshStock()` |
+| `data_update_task.cc` | API URL 更新为12个标的；重写解析逻辑（GBK安全、field_offset-3）；切换页面立即获取；开盘时刻自动刷新；交易时间15:30收盘；非交易时间30分钟间隔；缓冲区32KB |
+| `waveshare-s3-rlcd-4.2.cc` | 新增 BOOT 长按强制刷新（仅股票页生效，显示"刷新中..."） |
+| `build_default_assets.py` | 修复 `encoding="utf-8"` 编码问题 |

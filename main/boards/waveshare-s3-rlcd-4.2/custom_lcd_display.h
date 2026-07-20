@@ -145,6 +145,7 @@ private:
     
     // 省电模式：5 分钟无活动后降低刷新频率（1秒 → 5秒）
     std::atomic<bool> power_saving_{false};     // 是否处于省电模式
+    std::atomic<bool> force_stock_refresh_{false}; // 强制刷新股票数据标志
     uint32_t last_activity_ms_ = 0;             // 上次用户活动的时间（tick 毫秒）
     static const uint32_t IDLE_TIMEOUT_MS = 5 * 60 * 1000;  // 5 分钟无活动进入省电
     static const int NORMAL_REFRESH_MS = 1000;  // 正常刷新间隔 1 秒
@@ -190,6 +191,9 @@ public:
     // 省电模式：记录用户活动，唤醒省电模式
     void NotifyUserActivity();
     bool IsPowerSaving() const { return power_saving_; }
+
+    // 强制刷新股票数据
+    void ForceRefreshStock() { force_stock_refresh_ = true; }
     
     // 重写小智的 AI 显示方法，适配到左下角卡片
     virtual void SetChatMessage(const char* role, const char* content) override;
