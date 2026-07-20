@@ -379,12 +379,12 @@ void CustomLcdDisplay::ApplyDisplayMode() {
 
 void CustomLcdDisplay::CycleDisplayMode() {
     DisplayLockGuard lock(this);
-    // 四页循环：天气 → 音乐 → 番茄钟 → 股票 → 天气
+    // 四页循环：天气 → 股票 → 音乐 → 番茄钟 → 天气
     switch (display_mode_) {
-        case MODE_WEATHER:  display_mode_ = MODE_MUSIC; break;
+        case MODE_WEATHER:  display_mode_ = MODE_STOCK; break;
+        case MODE_STOCK:    display_mode_ = MODE_MUSIC; break;
         case MODE_MUSIC:    display_mode_ = MODE_POMODORO; break;
-        case MODE_POMODORO: display_mode_ = MODE_STOCK; break;
-        case MODE_STOCK:    display_mode_ = MODE_WEATHER; break;
+        case MODE_POMODORO: display_mode_ = MODE_WEATHER; break;
     }
     ApplyDisplayMode();
     const char* name = "未知";
@@ -527,21 +527,36 @@ void CustomLcdDisplay::SwitchToNextStock() {
 
     // 更新左侧列表高亮
     for (int i = 0; i < stock_list_count_; i++) {
-        lv_obj_t* lbl = stock_list_items_[i];
-        if (!lbl) continue;
+        lv_obj_t* name_lbl = stock_list_items_[i];
+        lv_obj_t* price_lbl = stock_price_items_[i];
+        if (!name_lbl) continue;
         if (i == stock_current_index_) {
-            lv_obj_set_style_text_color(lbl, lv_color_black(), 0);
-            lv_obj_set_style_bg_opa(lbl, LV_OPA_COVER, 0);
-            lv_obj_set_style_bg_color(lbl, lv_color_white(), 0);
-            lv_obj_set_style_pad_left(lbl, 2, 0);
-            lv_obj_set_style_pad_right(lbl, 2, 0);
+            lv_obj_set_style_text_color(name_lbl, lv_color_white(), 0);
+            lv_obj_set_style_bg_opa(name_lbl, LV_OPA_COVER, 0);
+            lv_obj_set_style_bg_color(name_lbl, lv_color_black(), 0);
+            lv_obj_set_style_pad_left(name_lbl, 2, 0);
+            lv_obj_set_style_pad_right(name_lbl, 2, 0);
+            if (price_lbl) {
+                lv_obj_set_style_text_color(price_lbl, lv_color_white(), 0);
+                lv_obj_set_style_bg_opa(price_lbl, LV_OPA_COVER, 0);
+                lv_obj_set_style_bg_color(price_lbl, lv_color_black(), 0);
+            }
         } else {
-            lv_obj_set_style_text_color(lbl, lv_color_white(), 0);
-            lv_obj_set_style_bg_opa(lbl, LV_OPA_TRANSP, 0);
+            lv_obj_set_style_text_color(name_lbl, lv_color_black(), 0);
+            lv_obj_set_style_bg_opa(name_lbl, LV_OPA_TRANSP, 0);
+            if (price_lbl) {
+                lv_obj_set_style_text_color(price_lbl, lv_color_black(), 0);
+                lv_obj_set_style_bg_opa(price_lbl, LV_OPA_TRANSP, 0);
+            }
         }
     }
 
     ESP_LOGI(TAG, "切换到股票: %s %s (%d/%d)", stock.name, stock.code, stock_current_index_ + 1, stock_list_count_);
+
+    // 用存储的数据刷新右侧详情
+    UpdateStockLabels(stock_current_index_, stock.price, stock.change_pct,
+                      stock.open, stock.pre_close, stock.high, stock.low,
+                      stock.amount, stock.turnover);
 }
 
 void CustomLcdDisplay::AddStock(const char* code, const char* name) {
@@ -553,14 +568,32 @@ void CustomLcdDisplay::AddStock(const char* code, const char* name) {
 
 void CustomLcdDisplay::UpdateStockLabels(int index, float price, float change_pct,
                                           float open, float pre_close, float high, float low,
-                                          float amount) {
+                                          float amount, float turnover) {
     DisplayLockGuard lock(this);
 
-    // 更新左侧列表价格
-    if (index >= 0 && index < stock_list_count_ && stock_list_items_[index]) {
-        char buf[32];
-        snprintf(buf, sizeof(buf), "%s  %.2f", stock_list_[index].name, price);
-        lv_label_set_text(stock_list_items_[index], buf);
+    // 更新左侧列表
+    if (index >= 0 && index < stock_list_count_) {
+        // 存储最新数据
+        stock_list_[index].price = price;
+        stock_list_[index].change_pct = change_pct;
+        stock_list_[index].open = open;
+        stock_list_[index].pre_close = pre_close;
+        stock_list_[index].high = high;
+        stock_list_[index].low = low;
+        stock_list_[index].amount = amount;
+        stock_list_[index].turnover = turnover;
+
+        // 名称标签
+        if (stock_list_items_[index]) {
+            lv_label_set_text(stock_list_items_[index], stock_list_[index].name);
+        }
+        // 价格标签（右对齐，带涨跌箭头）
+        if (stock_price_items_[index]) {
+            const char* arrow = change_pct >= 0 ? "▲" : "▼";
+            char buf[16];
+            snprintf(buf, sizeof(buf), "%s%.2f", arrow, price);
+            lv_label_set_text(stock_price_items_[index], buf);
+        }
     }
 
     // 只更新当前选中的股票详情
@@ -607,11 +640,27 @@ void CustomLcdDisplay::UpdateStockLabels(int index, float price, float change_pc
         snprintf(buf, sizeof(buf), "涨跌额:%s%.2f", arrow, change_amount);
         lv_label_set_text(stock_change_label_, buf);
     }
+
+    // 振幅
+    if (stock_amplitude_label_) {
+        float amplitude = (pre_close > 0) ? (high - low) / pre_close * 100.0f : 0;
+        char buf[24];
+        snprintf(buf, sizeof(buf), "振幅:%.2f%%", amplitude);
+        lv_label_set_text(stock_amplitude_label_, buf);
+    }
+
+    // 换手率
+    if (stock_turnover_label_) {
+        char buf[24];
+        snprintf(buf, sizeof(buf), "换手:%.2f%%", turnover);
+        lv_label_set_text(stock_turnover_label_, buf);
+    }
 }
 
 void CustomLcdDisplay::UpdateStockIndexLabels(float sh_index, float sh_change,
                                                float sz_index, float sz_change,
-                                               float cy_index, float cy_change) {
+                                               float cy_index, float cy_change,
+                                               float kc50_index, float kc50_change) {
     DisplayLockGuard lock(this);
 
     // 顶部指数栏（上证 + 深证）
@@ -624,11 +673,13 @@ void CustomLcdDisplay::UpdateStockIndexLabels(float sh_index, float sh_change,
         lv_label_set_text(stock_index_top_label_, buf);
     }
 
-    // 底部创业板指
+    // 底部创业板 + 科创50（一行显示）
     if (stock_index_bottom_label_) {
-        char buf[40];
+        char buf[80];
         const char* cy_arrow = cy_change >= 0 ? "+" : "";
-        snprintf(buf, sizeof(buf), "创业板 %.2f %s%.2f%%", cy_index, cy_arrow, cy_change);
+        const char* kc50_arrow = kc50_change >= 0 ? "+" : "";
+        snprintf(buf, sizeof(buf), "创业板 %.2f %s%.1f%%  科创50 %.2f %s%.1f%%",
+                 cy_index, cy_arrow, cy_change, kc50_index, kc50_arrow, kc50_change);
         lv_label_set_text(stock_index_bottom_label_, buf);
     }
 }

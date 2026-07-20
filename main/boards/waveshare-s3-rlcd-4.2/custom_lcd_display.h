@@ -43,6 +43,14 @@ private:
     struct StockInfo {
         const char* code;
         const char* name;
+        float price;
+        float change_pct;
+        float open;
+        float pre_close;
+        float high;
+        float low;
+        float amount;
+        float turnover;
     };
 
     // RLCD 硬件驱动（独立模块，负责 SPI 通信和像素操作）
@@ -51,7 +59,8 @@ private:
     lv_obj_t *music_page_ = nullptr;
     lv_obj_t *pomodoro_page_ = nullptr;
     lv_obj_t *stock_page_ = nullptr;
-    lv_obj_t *stock_list_items_[STOCK_MAX_COUNT] = {};  // 列表项 label
+    lv_obj_t *stock_list_items_[STOCK_MAX_COUNT] = {};  // 列表项 name label
+    lv_obj_t *stock_price_items_[STOCK_MAX_COUNT] = {}; // 列表项 price label（右对齐）
 
     // ===== 天气站 UI 组件 =====
     // 状态栏（右上角浮动胶囊）
@@ -108,7 +117,13 @@ private:
     lv_obj_t *stock_high_low_label_ = nullptr;    // 最高/最低
     lv_obj_t *stock_amount_label_ = nullptr;      // 成交额
     lv_obj_t *stock_change_label_ = nullptr;      // 涨跌额
-    lv_obj_t *stock_index_bottom_label_ = nullptr;// 底部创业板指
+    lv_obj_t *stock_amplitude_label_ = nullptr;   // 振幅
+    lv_obj_t *stock_turnover_label_ = nullptr;    // 换手率
+    lv_obj_t *stock_index_bottom_label_ = nullptr;// 底部创业板+科创50
+    lv_obj_t *stock_wifi_icon_img_ = nullptr;     // 股票页状态栏 WiFi 图标
+    lv_obj_t *stock_battery_icon_img_ = nullptr;  // 股票页状态栏电池图标
+    lv_obj_t *stock_battery_pct_label_ = nullptr; // 股票页状态栏电量文字
+    lv_obj_t *stock_time_label_ = nullptr;        // 股票页状态栏时钟
     // 股票列表管理
     StockInfo stock_list_[STOCK_MAX_COUNT];
     int stock_list_count_ = 0;
@@ -210,10 +225,11 @@ public:
     void AddStock(const char* code, const char* name);
     void UpdateStockLabels(int index, float price, float change_pct,
                            float open, float pre_close, float high, float low,
-                           float amount);
+                           float amount, float turnover);
     void UpdateStockIndexLabels(float sh_index, float sh_change,
                                 float sz_index, float sz_change,
-                                float cy_index, float cy_change);
+                                float cy_index, float cy_change,
+                                float kc50_index, float kc50_change);
 
     // 番茄钟 UI 更新方法
     void UpdatePomodoroDisplay(const char* state_text, const char* countdown_text,

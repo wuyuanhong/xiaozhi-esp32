@@ -463,7 +463,7 @@ def read_wakenet_from_sdkconfig(sdkconfig_path):
         return []
         
     models = []
-    with io.open(sdkconfig_path, "r") as f:
+    with io.open(sdkconfig_path, "r", encoding="utf-8") as f:
         for label in f:
             label = label.strip("\n")
             if 'CONFIG_SR_WN' in label and '#' not in label[0]:
@@ -488,7 +488,7 @@ def read_multinet_from_sdkconfig(sdkconfig_path):
         print(f"Warning: sdkconfig file not found: {sdkconfig_path}")
         return []
         
-    with io.open(sdkconfig_path, "r") as f:
+    with io.open(sdkconfig_path, "r", encoding="utf-8") as f:
         models_string = ''
         for label in f:
             label = label.strip("\n")
@@ -549,7 +549,7 @@ def read_wake_word_type_from_sdkconfig(sdkconfig_path):
         'wake_word_disabled': False
     }
     
-    with io.open(sdkconfig_path, "r") as f:
+    with io.open(sdkconfig_path, "r", encoding="utf-8") as f:
         for line in f:
             line = line.strip("\n")
             if line.startswith('#'):
@@ -578,7 +578,7 @@ def read_custom_wake_word_from_sdkconfig(sdkconfig_path):
         return None
         
     config_values = {}
-    with io.open(sdkconfig_path, "r") as f:
+    with io.open(sdkconfig_path, "r", encoding="utf-8") as f:
         for line in f:
             line = line.strip("\n")
             if line.startswith('#') or '=' not in line:
