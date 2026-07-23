@@ -113,12 +113,8 @@ private:
             if (display_ && display_->IsStockMode()) {
                 display_->ForceRefreshStock();
                 ESP_LOGI(TAG, "BOOT 长按：强制刷新股票数据");
-                // 视觉反馈：在AI状态区显示"刷新中..."
-                auto* label = display_->GetChatStatusLabel();
-                if (label) {
-                    lv_label_set_text(label, "刷新中...");
-                    lv_obj_remove_flag(label, LV_OBJ_FLAG_HIDDEN);
-                }
+                // 视觉反馈：显示刷新提示
+                display_->ShowRefreshIndicator(true);
                 return;
             }
         });

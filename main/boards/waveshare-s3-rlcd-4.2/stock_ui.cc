@@ -118,6 +118,18 @@ void CustomLcdDisplay::SetupStockUI() {
     lv_obj_center(stock_index_top_label_);
     lv_label_set_text(stock_index_top_label_, "上证 ----  深证 ----");
 
+    // 刷新提示（隐藏，长按BOOT时显示）
+    stock_refresh_label_ = lv_label_create(screen);
+    lv_obj_set_style_text_font(stock_refresh_label_, f, 0);
+    lv_obj_set_style_text_color(stock_refresh_label_, lv_color_black(), 0);
+    lv_obj_set_style_bg_opa(stock_refresh_label_, LV_OPA_COVER, 0);
+    lv_obj_set_style_bg_color(stock_refresh_label_, lv_color_white(), 0);
+    lv_obj_set_style_pad_left(stock_refresh_label_, 4, 0);
+    lv_obj_set_style_pad_right(stock_refresh_label_, 4, 0);
+    lv_obj_align(stock_refresh_label_, LV_ALIGN_TOP_RIGHT, -10, 36);
+    lv_label_set_text(stock_refresh_label_, "刷新中...");
+    lv_obj_add_flag(stock_refresh_label_, LV_OBJ_FLAG_HIDDEN);
+
     // ===== 左侧股票列表卡片（加宽到 140px，6只股票）=====
     int list_y = 36 + 26 + gap;  // y=68
     int list_h = 300 - list_y - 32 - gap;  // 底部留32给一行指数
