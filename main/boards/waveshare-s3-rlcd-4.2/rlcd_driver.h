@@ -37,6 +37,8 @@ public:
     void RLCD_ColorClear(uint8_t color);
     // 设置单个像素
     void RLCD_SetPixel(uint16_t x, uint16_t y, uint8_t color);
+    // 批量写入矩形区域（RGB565 → 1-bit，用于 LVGL flush）
+    void RLCD_FlushArea(int x1, int y1, int x2, int y2, uint16_t *color_p);
     // 将缓冲区内容刷新到屏幕
     void RLCD_Display();
     // 设置屏幕对比度 (0x00-0x1F)

@@ -188,6 +188,24 @@ void RlcdDriver::RLCD_SetPixel(uint16_t x, uint16_t y, uint8_t color) {
         *p &= ~mask;
 }
 
+void RlcdDriver::RLCD_FlushArea(int x1, int y1, int x2, int y2, uint16_t *color_p) {
+    // 直接批量转换 RGB565 → 1-bit，写入 DispBuffer
+    // 比逐像素调用 RLCD_SetPixel 快很多（减少函数调用和重复计算）
+    for (int y = y1; y <= y2; y++) {
+        for (int x = x1; x <= x2; x++) {
+            uint16_t pixel = *color_p++;
+            uint8_t color = (pixel < 0x7fff) ? ColorBlack : ColorWhite;
+            uint32_t idx = PixelIndexLUT[x][y];
+            uint8_t  mask = PixelBitLUT[x][y];
+            uint8_t *p = &DispBuffer[idx];
+            if (color)
+                *p |= mask;
+            else
+                *p &= ~mask;
+        }
+    }
+}
+
 void RlcdDriver::RLCD_Display() {
     RLCD_SendCommand(0x2A);
     RLCD_SendData(0x12);

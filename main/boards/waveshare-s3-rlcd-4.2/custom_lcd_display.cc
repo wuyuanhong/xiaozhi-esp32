@@ -39,16 +39,8 @@ void CustomLcdDisplay::Lvgl_flush_cb(lv_display_t * disp, const lv_area_t * area
     assert(disp != NULL);
     CustomLcdDisplay *self = (CustomLcdDisplay *)lv_display_get_user_data(disp);
     RlcdDriver *rlcd = self->rlcd_;
-    uint16_t *buffer = (uint16_t *)color_p;
-    for(int y = area->y1; y <= area->y2; y++)
-    {
-        for(int x = area->x1; x <= area->x2; x++) 
-        {
-            uint8_t color = (*buffer < 0x7fff) ? ColorBlack : ColorWhite;
-            rlcd->RLCD_SetPixel(x, y, color);
-            buffer++;
-        }
-    }
+    // 使用批量写入，比逐像素 RLCD_SetPixel 快很多
+    rlcd->RLCD_FlushArea(area->x1, area->y1, area->x2, area->y2, (uint16_t *)color_p);
     rlcd->RLCD_Display();
     lv_disp_flush_ready(disp);
 }
@@ -70,7 +62,7 @@ CustomLcdDisplay::CustomLcdDisplay(esp_lcd_panel_io_handle_t panel_io,
     lv_init();
     lvgl_port_cfg_t port_cfg = ESP_LVGL_PORT_INIT_CONFIG();
     port_cfg.task_priority = 2;
-    port_cfg.timer_period_ms = 50;
+    port_cfg.timer_period_ms = 10;  // 10ms → 100FPS（之前50ms=20FPS）
     lvgl_port_init(&port_cfg);
     lvgl_port_lock(0);
 
