@@ -566,6 +566,33 @@ void CustomLcdDisplay::AddStock(const char* code, const char* name) {
     stock_list_count_++;
 }
 
+void CustomLcdDisplay::ShowRefreshIndicator(bool show) {
+    DisplayLockGuard lock(this);
+    if (stock_refresh_label_) {
+        if (show) {
+            lv_obj_remove_flag(stock_refresh_label_, LV_OBJ_FLAG_HIDDEN);
+        } else {
+            lv_obj_add_flag(stock_refresh_label_, LV_OBJ_FLAG_HIDDEN);
+        }
+    }
+}
+
+void CustomLcdDisplay::FlashAlertLabel(int stock_index) {
+    // 直接用 stock_index 找到对应的标签，反色显示
+    if (stock_index >= 0 && stock_index < stock_list_count_) {
+        if (stock_price_items_[stock_index]) {
+            lv_obj_set_style_text_color(stock_price_items_[stock_index], lv_color_white(), 0);
+            lv_obj_set_style_bg_opa(stock_price_items_[stock_index], LV_OPA_COVER, 0);
+            lv_obj_set_style_bg_color(stock_price_items_[stock_index], lv_color_black(), 0);
+        }
+        if (stock_list_items_[stock_index]) {
+            lv_obj_set_style_text_color(stock_list_items_[stock_index], lv_color_white(), 0);
+            lv_obj_set_style_bg_opa(stock_list_items_[stock_index], LV_OPA_COVER, 0);
+            lv_obj_set_style_bg_color(stock_list_items_[stock_index], lv_color_black(), 0);
+        }
+    }
+}
+
 void CustomLcdDisplay::UpdateStockLabels(int index, float price, float change_pct,
                                           float open, float pre_close, float high, float low,
                                           float amount, float turnover) {

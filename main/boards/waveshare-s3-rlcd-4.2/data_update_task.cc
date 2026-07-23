@@ -510,7 +510,7 @@ void CustomLcdDisplay::DataUpdateTask(void *arg) {
                 int weekday = timeinfo.tm_wday;
                 if (weekday >= 1 && weekday <= 5) {  // 周一到周五
                     int t = hour * 60 + min;
-                    if ((t >= 570 && t <= 710) || (t >= 780 && t <= 930)) {  // 9:30-11:30, 13:00-15:30
+                    if ((t >= 570 && t <= 710) || (t >= 780 && t <= 900)) {  // 9:30-11:30, 13:00-15:00
                         is_trading = true;
                     }
                 }
@@ -673,16 +673,51 @@ void CustomLcdDisplay::DataUpdateTask(void *arg) {
                                 // === 报警检测 ===
                                 // 只在空闲状态才报警（避免打断 AI 对话或音乐）
                                 if (ds == kDeviceStateIdle) {
-                                    const float INDEX_ALERT_THRESHOLD = 1.0f;   // 指数：1%
+                                    const float STOCK_ALERT_THRESHOLD = 3.0f;    // 个股：±3%
+                                    const float INDEX_ALERT_THRESHOLD = 1.0f;    // 指数：±1%
                                     const uint32_t ALERT_COOLDOWN_MS = 10 * 60 * 1000;  // 10分钟冷却
+                                    static uint32_t last_stock_alert_ms[10] = {};
                                     static uint32_t last_index_alert_ms = 0;
+                                    static float last_alert_prices[10] = {};  // 个股报警时的价格基准
 
-                                    // 检查上证/深证报警
-                                    if ((fabsf(sh_change) >= INDEX_ALERT_THRESHOLD || fabsf(sz_change) >= INDEX_ALERT_THRESHOLD) &&
+                                    bool any_alert = false;
+
+                                    // 个股报警：当前价格 vs 上次报警时的价格变化超 ±3%
+                                    for (int i = 0; i < self->stock_list_count_ && i < 10; i++) {
+                                        float cur_price = self->stock_list_[i].price;
+                                        float ref_price = last_alert_prices[i];
+                                        if (ref_price > 0 && cur_price > 0) {
+                                            float change = fabsf((cur_price - ref_price) / ref_price * 100.0f);
+                                            if (change >= STOCK_ALERT_THRESHOLD &&
+                                                (now_ms - last_stock_alert_ms[i] > ALERT_COOLDOWN_MS)) {
+                                                ESP_LOGW(TAG, "报警：%s 价格 %.2f→%.2f 变化 %.1f%%",
+                                                         self->stock_list_[i].name, ref_price, cur_price, change);
+                                                any_alert = true;
+                                                last_stock_alert_ms[i] = now_ms;
+                                                last_alert_prices[i] = cur_price;  // 更新基准价
+                                                // 反色闪烁该股票标签
+                                                self->FlashAlertLabel(i);
+                                            }
+                                        } else {
+                                            // 首次获取数据，设置基准价
+                                            last_alert_prices[i] = cur_price;
+                                        }
+                                    }
+
+                                    // 指数报警：涨跌幅超 ±1%
+                                    if ((fabsf(sh_change) >= INDEX_ALERT_THRESHOLD ||
+                                         fabsf(sz_change) >= INDEX_ALERT_THRESHOLD ||
+                                         fabsf(cy_change) >= INDEX_ALERT_THRESHOLD) &&
                                         (now_ms - last_index_alert_ms > ALERT_COOLDOWN_MS)) {
-                                        ESP_LOGW(TAG, "报警：指数涨跌 上证%.2f%% 深证%.2f%%", sh_change, sz_change);
-                                        app.PlaySound(Lang::Sounds::OGG_LOW_BATTERY);
+                                        ESP_LOGW(TAG, "报警：指数 上证%.2f%% 深证%.2f%% 创业板%.2f%%",
+                                                 sh_change, sz_change, cy_change);
+                                        any_alert = true;
                                         last_index_alert_ms = now_ms;
+                                    }
+
+                                    // 播放提示音
+                                    if (any_alert) {
+                                        app.PlaySound(Lang::Sounds::OGG_POPUP);
                                     }
                                 }
 
@@ -693,6 +728,8 @@ void CustomLcdDisplay::DataUpdateTask(void *arg) {
                     }
                     esp_http_client_cleanup(client);
                     stock_last_sync_ms = now_ms;
+                    // 数据获取完成，隐藏刷新提示
+                    self->ShowRefreshIndicator(false);
                 }
             }
 

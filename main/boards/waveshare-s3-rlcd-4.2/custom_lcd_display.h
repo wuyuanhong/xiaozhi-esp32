@@ -111,6 +111,7 @@ private:
 
     // ===== 股票页 UI 组件 =====
     lv_obj_t *stock_index_top_label_ = nullptr;   // 顶部指数栏（上证+深证）
+    lv_obj_t *stock_refresh_label_ = nullptr;     // 刷新提示（长按BOOT时显示）
     lv_obj_t *stock_name_label_ = nullptr;        // 股票名称+代码
     lv_obj_t *stock_price_label_ = nullptr;       // 当前价格+涨跌幅
     lv_obj_t *stock_info_label_ = nullptr;        // 今开/昨收
@@ -194,6 +195,8 @@ public:
 
     // 强制刷新股票数据
     void ForceRefreshStock() { force_stock_refresh_ = true; }
+    void ShowRefreshIndicator(bool show);
+    void FlashAlertLabel(int stock_index);
     
     // 重写小智的 AI 显示方法，适配到左下角卡片
     virtual void SetChatMessage(const char* role, const char* content) override;
