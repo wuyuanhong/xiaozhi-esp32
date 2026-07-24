@@ -354,3 +354,21 @@ idf.py -p COM9 monitor
 - **SK海力士**（美股）无法通过 A 股 API 获取
 - **换手率字段** [38] 对 ETF 可能不准确，需验证
 - **LVGL 对象数量较多**，已增大 esp_timer 栈到 8192 防止崩溃
+
+#### 6. 页面切换速度优化
+
+**问题：** 切换页面有时快有时慢，原因是 LVGL 锁竞争。
+
+**优化措施：**
+1. **批量像素写入**：flush 回调从逐像素 `RLCD_SetPixel`（12万次函数调用）改为批量 `RLCD_FlushArea`
+2. **提升刷新率**：LVGL 定时器 50ms → 10ms（20FPS → 100FPS）
+3. **减少锁持有时间**：
+   - 数据解析（64次 `extract_field`）移到锁外面
+   - 报警检测移到锁外面
+   - 锁内只做 LVGL 标签更新（~10次 `lv_label_set_text`）
+   - 持锁时间从 ~30ms 降到 ~3ms
+
+**改动文件：**
+- `rlcd_driver.h/cc`：新增 `RLCD_FlushArea` 批量写入方法
+- `custom_lcd_display.cc`：flush 回调改用批量写入，LVGL 定时器加速
+- `data_update_task.cc`：解析和报警检测移到锁外面

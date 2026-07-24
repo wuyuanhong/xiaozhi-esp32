@@ -621,16 +621,10 @@ void CustomLcdDisplay::DataUpdateTask(void *arg) {
                                 kc50_index  = extract_field(response, "v_sh000688", "000688", 3);
                                 kc50_change = extract_field(response, "v_sh000688", "000688", 32);
 
-                                // 更新指数标签
-                                DisplayLockGuard lock(self);
-                                ESP_LOGI(TAG, "指数: 上证=%.2f(%.2f%%) 深证=%.2f(%.2f%%) 创业板=%.2f(%.2f%%) 科创50=%.2f(%.2f%%)",
-                                         sh_index, sh_change, sz_index, sz_change, cy_index, cy_change, kc50_index, kc50_change);
-                                self->UpdateStockIndexLabels(sh_index, sh_change, sz_index, sz_change, cy_index, cy_change, kc50_index, kc50_change);
-
-                                // 解析自选股数据并更新
+                                // 在锁外面解析所有数据（纯字符串处理，不需要LVGL锁）
                                 struct StockParse {
-                                    const char* var_name;  // "v_sh601012"
-                                    const char* code;      // "601012"
+                                    const char* var_name;
+                                    const char* code;
                                 };
                                 static const StockParse stocks[] = {
                                     {"v_sh601012", "601012"},
@@ -643,82 +637,89 @@ void CustomLcdDisplay::DataUpdateTask(void *arg) {
                                     {"v_sz001309", "001309"},
                                 };
 
-                                for (const auto& sp : stocks) {
-                                    float price     = extract_field(response, sp.var_name, sp.code, 3);
-                                    float pre_close = extract_field(response, sp.var_name, sp.code, 4);
-                                    float open      = extract_field(response, sp.var_name, sp.code, 5);
-                                    float high      = extract_field(response, sp.var_name, sp.code, 33);
-                                    float low       = extract_field(response, sp.var_name, sp.code, 34);
-                                    float amount    = extract_field(response, sp.var_name, sp.code, 37);
-                                    float change_pct= extract_field(response, sp.var_name, sp.code, 32);
-                                    float turnover  = extract_field(response, sp.var_name, sp.code, 38);
+                                // 预解析所有股票数据
+                                struct ParsedStock {
+                                    float price, pre_close, open, high, low, amount, change_pct, turnover;
+                                    int match_index;  // 匹配到的stock_list索引，-1表示未匹配
+                                };
+                                ParsedStock parsed[8] = {};
 
-                                    if (price <= 0) continue;  // 未找到该股票，跳过
+                                for (int s = 0; s < 8; s++) {
+                                    const auto& sp = stocks[s];
+                                    parsed[s].price      = extract_field(response, sp.var_name, sp.code, 3);
+                                    parsed[s].pre_close  = extract_field(response, sp.var_name, sp.code, 4);
+                                    parsed[s].open       = extract_field(response, sp.var_name, sp.code, 5);
+                                    parsed[s].high       = extract_field(response, sp.var_name, sp.code, 33);
+                                    parsed[s].low        = extract_field(response, sp.var_name, sp.code, 34);
+                                    parsed[s].amount     = extract_field(response, sp.var_name, sp.code, 37);
+                                    parsed[s].change_pct = extract_field(response, sp.var_name, sp.code, 32);
+                                    parsed[s].turnover   = extract_field(response, sp.var_name, sp.code, 38);
+                                    parsed[s].match_index = -1;
 
-                                    // 构造 code 格式："sh600519" / "sz000001"
+                                    if (parsed[s].price <= 0) continue;
+
                                     char full_code[16];
-                                    snprintf(full_code, sizeof(full_code), "%.2s%s",
-                                             sp.var_name + 2, sp.code);  // "sh" or "sz" + code
+                                    snprintf(full_code, sizeof(full_code), "%.2s%s", sp.var_name + 2, sp.code);
 
-                                    // 找到对应股票索引并更新
                                     for (int i = 0; i < self->stock_list_count_; i++) {
                                         if (strcmp(self->stock_list_[i].code, full_code) == 0) {
-                                            ESP_LOGI(TAG, "股票[%d] %s: 价格=%.2f 涨跌=%.2f%%", i, full_code, price, change_pct);
-                                            self->UpdateStockLabels(i, price, change_pct, open, pre_close, high, low, amount, turnover);
+                                            parsed[s].match_index = i;
+                                            ESP_LOGI(TAG, "股票[%d] %s: 价格=%.2f 涨跌=%.2f%%", i, full_code, parsed[s].price, parsed[s].change_pct);
                                             break;
                                         }
                                     }
                                 }
 
-                                // === 报警检测 ===
-                                // 只在空闲状态才报警（避免打断 AI 对话或音乐）
+                                // 报警检测（也在锁外面）
+                                const float STOCK_ALERT_THRESHOLD = 3.0f;
+                                const float INDEX_ALERT_THRESHOLD = 1.0f;
+                                const uint32_t ALERT_COOLDOWN_MS = 10 * 60 * 1000;
+                                static uint32_t last_stock_alert_ms[10] = {};
+                                static uint32_t last_index_alert_ms = 0;
+                                static float last_alert_prices[10] = {};
+                                bool any_alert = false;
+
                                 if (ds == kDeviceStateIdle) {
-                                    const float STOCK_ALERT_THRESHOLD = 3.0f;    // 个股：±3%
-                                    const float INDEX_ALERT_THRESHOLD = 1.0f;    // 指数：±1%
-                                    const uint32_t ALERT_COOLDOWN_MS = 10 * 60 * 1000;  // 10分钟冷却
-                                    static uint32_t last_stock_alert_ms[10] = {};
-                                    static uint32_t last_index_alert_ms = 0;
-                                    static float last_alert_prices[10] = {};  // 个股报警时的价格基准
-
-                                    bool any_alert = false;
-
-                                    // 个股报警：当前价格 vs 上次报警时的价格变化超 ±3%
+                                    if ((fabsf(sh_change) >= INDEX_ALERT_THRESHOLD || fabsf(sz_change) >= INDEX_ALERT_THRESHOLD ||
+                                         fabsf(cy_change) >= INDEX_ALERT_THRESHOLD) &&
+                                        (now_ms - last_index_alert_ms > ALERT_COOLDOWN_MS)) {
+                                        ESP_LOGW(TAG, "报警：指数 上证%.2f%% 深证%.2f%% 创业板%.2f%%", sh_change, sz_change, cy_change);
+                                        any_alert = true;
+                                        last_index_alert_ms = now_ms;
+                                    }
                                     for (int i = 0; i < self->stock_list_count_ && i < 10; i++) {
                                         float cur_price = self->stock_list_[i].price;
                                         float ref_price = last_alert_prices[i];
                                         if (ref_price > 0 && cur_price > 0) {
                                             float change = fabsf((cur_price - ref_price) / ref_price * 100.0f);
-                                            if (change >= STOCK_ALERT_THRESHOLD &&
-                                                (now_ms - last_stock_alert_ms[i] > ALERT_COOLDOWN_MS)) {
-                                                ESP_LOGW(TAG, "报警：%s 价格 %.2f→%.2f 变化 %.1f%%",
-                                                         self->stock_list_[i].name, ref_price, cur_price, change);
+                                            if (change >= STOCK_ALERT_THRESHOLD && (now_ms - last_stock_alert_ms[i] > ALERT_COOLDOWN_MS)) {
+                                                ESP_LOGW(TAG, "报警：%s 价格 %.2f→%.2f 变化 %.1f%%", self->stock_list_[i].name, ref_price, cur_price, change);
                                                 any_alert = true;
                                                 last_stock_alert_ms[i] = now_ms;
-                                                last_alert_prices[i] = cur_price;  // 更新基准价
-                                                // 反色闪烁该股票标签
+                                                last_alert_prices[i] = cur_price;
                                                 self->FlashAlertLabel(i);
                                             }
                                         } else {
-                                            // 首次获取数据，设置基准价
                                             last_alert_prices[i] = cur_price;
                                         }
                                     }
+                                }
 
-                                    // 指数报警：涨跌幅超 ±1%
-                                    if ((fabsf(sh_change) >= INDEX_ALERT_THRESHOLD ||
-                                         fabsf(sz_change) >= INDEX_ALERT_THRESHOLD ||
-                                         fabsf(cy_change) >= INDEX_ALERT_THRESHOLD) &&
-                                        (now_ms - last_index_alert_ms > ALERT_COOLDOWN_MS)) {
-                                        ESP_LOGW(TAG, "报警：指数 上证%.2f%% 深证%.2f%% 创业板%.2f%%",
-                                                 sh_change, sz_change, cy_change);
-                                        any_alert = true;
-                                        last_index_alert_ms = now_ms;
+                                // 最后才短暂获取锁，只做LVGL标签更新
+                                {
+                                    DisplayLockGuard lock(self);
+                                    self->UpdateStockIndexLabels(sh_index, sh_change, sz_index, sz_change, cy_index, cy_change, kc50_index, kc50_change);
+                                    for (int s = 0; s < 8; s++) {
+                                        if (parsed[s].match_index >= 0) {
+                                            self->UpdateStockLabels(parsed[s].match_index, parsed[s].price, parsed[s].change_pct,
+                                                parsed[s].open, parsed[s].pre_close, parsed[s].high, parsed[s].low,
+                                                parsed[s].amount, parsed[s].turnover);
+                                        }
                                     }
+                                }
 
-                                    // 播放提示音
-                                    if (any_alert) {
-                                        app.PlaySound(Lang::Sounds::OGG_POPUP);
-                                    }
+                                if (any_alert) {
+                                    app.PlaySound(Lang::Sounds::OGG_POPUP);
                                 }
 
                                 free(response);
