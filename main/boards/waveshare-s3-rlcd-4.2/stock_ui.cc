@@ -26,7 +26,7 @@
 #include <cstdio>
 #include <cstring>
 
-LV_FONT_DECLARE(font_puhui_16_4);
+LV_FONT_DECLARE(font_noto_sans_basic_16_4);
 
 // 声明状态栏图标
 LV_IMAGE_DECLARE(ui_img_wifi);
@@ -58,7 +58,7 @@ static lv_obj_t* create_card(lv_obj_t *parent, int x, int y, int w, int h,
 void CustomLcdDisplay::SetupStockUI() {
     DisplayLockGuard lock(this);
     lv_obj_t *root = lv_screen_active();
-    const lv_font_t *f = &font_puhui_16_4;
+    const lv_font_t *f = &font_noto_sans_basic_16_4;
 
     // ===== 页面容器 =====
     stock_page_ = lv_obj_create(root);

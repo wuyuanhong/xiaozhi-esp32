@@ -18,12 +18,6 @@
 #include <driver/gpio.h>
 #include <esp_log.h>
 #include <arpa/inet.h>
-#include <font_awesome.h>
-#include <esp_heap_caps.h>
-#include "esp_audio_dec_default.h"
-#include "esp_audio_simple_dec.h"
-#include "esp_audio_simple_dec_default.h"
-#include "esp_ae_rate_cvt.h"
 #include <cstring>
 
 #define TAG "Application"
