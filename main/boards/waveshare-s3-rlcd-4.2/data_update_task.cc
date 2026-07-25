@@ -671,6 +671,7 @@ void CustomLcdDisplay::DataUpdateTask(void *arg) {
                                 }
 
                                 // 报警检测（也在锁外面）
+                                // 只在交易时间且空闲状态才报警，避免晚上睡觉时一直响
                                 const float STOCK_ALERT_THRESHOLD = 3.0f;
                                 const float INDEX_ALERT_THRESHOLD = 1.0f;
                                 const uint32_t ALERT_COOLDOWN_MS = 10 * 60 * 1000;
@@ -679,7 +680,7 @@ void CustomLcdDisplay::DataUpdateTask(void *arg) {
                                 static float last_alert_prices[10] = {};
                                 bool any_alert = false;
 
-                                if (ds == kDeviceStateIdle) {
+                                if (ds == kDeviceStateIdle && is_trading) {
                                     if ((fabsf(sh_change) >= INDEX_ALERT_THRESHOLD || fabsf(sz_change) >= INDEX_ALERT_THRESHOLD ||
                                          fabsf(cy_change) >= INDEX_ALERT_THRESHOLD) &&
                                         (now_ms - last_index_alert_ms > ALERT_COOLDOWN_MS)) {
