@@ -144,6 +144,8 @@ dependencies:
     public: true
     version: '*'
 
+  espressif/zlib: "^1.2.13"
+
   ## Required IDF version
   idf:
     version: '>=5.5.2'

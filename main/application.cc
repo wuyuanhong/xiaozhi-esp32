@@ -18,6 +18,11 @@
 #include <driver/gpio.h>
 #include <esp_log.h>
 #include <arpa/inet.h>
+#include <esp_heap_caps.h>
+#include "esp_audio_dec_default.h"
+#include "esp_audio_simple_dec.h"
+#include "esp_audio_simple_dec_default.h"
+#include "esp_ae_rate_cvt.h"
 #include <cstring>
 
 #define TAG "Application"
@@ -846,6 +851,8 @@ void Application::HandleWakeWordDetectedEvent() {
     }
 
     auto state = GetDeviceState();
+    auto wake_word = audio_service_.GetLastWakeWord();
+    ESP_LOGI(TAG, "Wake word detected: %s (state: %d)", wake_word.c_str(), (int)state);
     
     if (state == kDeviceStateIdle) {
         BeginWakeWordInvoke(wake_word);
@@ -1053,6 +1060,10 @@ void Application::SetListeningMode(ListeningMode mode) {
     SetDeviceState(kDeviceStateListening);
 }
 
+ListeningMode Application::GetDefaultListeningMode() const {
+    return aec_mode_ == kAecOff ? kListeningModeAutoStop : kListeningModeRealtime;
+}
+
 void Application::Reboot() {
     ESP_LOGI(TAG, "Rebooting...");
     StopMusicPlayback();
@@ -1243,7 +1254,7 @@ bool Application::PlayMusicFromUrl(const std::string& url, const std::string& ti
     }
     SetDeviceState(kDeviceStateIdle);
     audio_service_.ResetDecoder();
-    audio_service_.SetExternalPlaybackActive(true);
+    // audio_service_.SetExternalPlaybackActive(true);  // TODO: adapt to new API
 
     // 音乐播放走 HTTP 流，不经过 AudioChannel，WiFi 不会自动切高性能
     // 这里手动关闭省电，避免 MAX_MODEM 休眠导致下载卡顿
@@ -1676,7 +1687,7 @@ void Application::MusicPlaybackTask(std::string url, std::string title, std::str
     if (http) {
         http->Close();
     }
-    audio_service_.SetExternalPlaybackActive(false);
+    // audio_service_.SetExternalPlaybackActive(false);  // TODO: adapt to new API
 
     bool stopped_by_user = stop_music_playback_.load();
     {

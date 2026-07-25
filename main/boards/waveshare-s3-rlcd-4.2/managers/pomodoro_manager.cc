@@ -264,7 +264,7 @@ void PomodoroManager::WhiteNoiseTask(void* arg) {
             break;
         }
 
-        audio_svc.SetExternalPlaybackActive(true);
+        // audio_svc.SetExternalPlaybackActive(true)  // TODO: adapt to new API;
 
         if (!codec->output_enabled()) {
             codec->EnableOutput(true);
@@ -286,7 +286,7 @@ void PomodoroManager::WhiteNoiseTask(void* arg) {
                                            ds == kDeviceStateSpeaking);
             if (in_voice_session) {
                 if (noise_output_enabled) {
-                    audio_svc.SetExternalPlaybackActive(false);
+                    // audio_svc.SetExternalPlaybackActive(false)  // TODO: adapt to new API;
                     if (codec->output_enabled()) {
                         codec->EnableOutput(false);
                     }
@@ -296,7 +296,7 @@ void PomodoroManager::WhiteNoiseTask(void* arg) {
                 continue;
             }
             if (!noise_output_enabled) {
-                audio_svc.SetExternalPlaybackActive(true);
+                // audio_svc.SetExternalPlaybackActive(true)  // TODO: adapt to new API;
                 if (!codec->output_enabled()) {
                     codec->EnableOutput(true);
                 }
@@ -451,7 +451,7 @@ cleanup:
     }
     if (in_buf) heap_caps_free(in_buf);
     if (out_buf) heap_caps_free(out_buf);
-    audio_svc.SetExternalPlaybackActive(false);
+    // audio_svc.SetExternalPlaybackActive(false)  // TODO: adapt to new API;
     if (noise_output_enabled && codec->output_enabled()) {
         codec->EnableOutput(false);
     }

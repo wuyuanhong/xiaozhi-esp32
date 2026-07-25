@@ -132,6 +132,8 @@ public:
      * Can be called from any task to release resources allocated after network connected
      * This includes closing audio channel, resetting protocol and ota objects
      */
+    void SetListeningMode(ListeningMode mode);
+    ListeningMode GetDefaultListeningMode() const;
     void ResetProtocol();
 
 private:
@@ -195,7 +197,6 @@ private:
     void CheckNewVersion();
     void InitializeProtocol();
     void ShowActivationCode(const std::string& code, const std::string& message);
-    void SetListeningMode(ListeningMode mode);
     void MusicPlaybackTask(std::string url, std::string title, std::string artist, std::string lyric_url = "");
     
     // State change handler called by state machine
