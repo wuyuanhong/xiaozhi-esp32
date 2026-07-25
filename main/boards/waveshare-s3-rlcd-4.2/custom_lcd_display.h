@@ -125,11 +125,28 @@ private:
     lv_obj_t *stock_battery_icon_img_ = nullptr;  // 股票页状态栏电池图标
     lv_obj_t *stock_battery_pct_label_ = nullptr; // 股票页状态栏电量文字
     lv_obj_t *stock_time_label_ = nullptr;        // 股票页状态栏时钟
+
     // 股票列表管理
     StockInfo stock_list_[STOCK_MAX_COUNT];
     int stock_list_count_ = 0;
     int stock_current_index_ = 0;
     bool stock_switching_ = false;  // 防止快速按键时重复切换
+
+    // ===== 数据/UI 分离：共享缓冲区 =====
+    // 数据层写入，UI层读取，避免锁竞争
+    struct StockDataBuffer {
+        float sh_index, sh_change;
+        float sz_index, sz_change;
+        float cy_index, cy_change;
+        float kc50_index, kc50_change;
+        struct {
+            float price, change_pct, open, pre_close, high, low, amount, turnover;
+            int match_index;
+        } stocks[STOCK_MAX_COUNT];
+        volatile bool ready;  // 数据就绪标志
+    };
+    StockDataBuffer stock_data_buf_;
+    esp_timer_handle_t stock_ui_timer_ = nullptr;  // UI更新定时器
 
     // 图片图标（不能用基类的 label，因为我们用 lv_image 而不是 Font Awesome 文字）
     lv_obj_t *wifi_icon_img_ = nullptr;
@@ -217,6 +234,8 @@ public:
     
     // 启动数据更新任务（需要在网络连接后调用）
     void StartDataUpdateTask();
+    // UI更新定时器回调（从共享缓冲区读取数据更新标签）
+    static void StockUITimerCallback(void* arg);
     
     // 刷新右下角备忘录列表显示（从 NVS 读取后格式化显示）
     void RefreshMemoDisplay();           // 自动获取锁（外部调用用这个）

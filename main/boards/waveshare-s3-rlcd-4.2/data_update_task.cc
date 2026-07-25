@@ -13,6 +13,7 @@
 
 #include <cmath>
 #include <cstring>
+#include <esp_timer.h>
 #include <cJSON.h>
 #include <sys/time.h>
 #include <freertos/FreeRTOS.h>
@@ -50,6 +51,45 @@ void CustomLcdDisplay::StartDataUpdateTask() {
     // 栈从 16KB 下调到 8KB，给音频/MQTT 留更多 SRAM 余量
     // 优先级保持较低，避免与语音收发实时链路抢占 CPU
     xTaskCreate(DataUpdateTask, "weather_ui_update", 8192, this, 2, &update_task_handle_);
+
+    // 启动 UI 更新定时器（每 500ms 检查一次是否有新数据）
+    esp_timer_create_args_t timer_args = {
+        .callback = StockUITimerCallback,
+        .name = "stock_ui_timer"
+    };
+    esp_timer_create(&timer_args, &stock_ui_timer_);
+    esp_timer_start_periodic(stock_ui_timer_, 500 * 1000);  // 500ms
+}
+
+// UI 定时器回调：从共享缓冲区读取数据更新标签
+void CustomLcdDisplay::StockUITimerCallback(void* arg) {
+    CustomLcdDisplay* self = (CustomLcdDisplay*)arg;
+
+    // 检查是否有新数据
+    if (!self->stock_data_buf_.ready) return;
+
+    // 获取 LVGL 锁更新标签（短暂持锁）
+    DisplayLockGuard lock(self);
+
+    // 更新指数
+    self->UpdateStockIndexLabels(
+        self->stock_data_buf_.sh_index, self->stock_data_buf_.sh_change,
+        self->stock_data_buf_.sz_index, self->stock_data_buf_.sz_change,
+        self->stock_data_buf_.cy_index, self->stock_data_buf_.cy_change,
+        self->stock_data_buf_.kc50_index, self->stock_data_buf_.kc50_change
+    );
+
+    // 更新股票详情
+    for (int s = 0; s < 8; s++) {
+        if (self->stock_data_buf_.stocks[s].match_index >= 0) {
+            auto& st = self->stock_data_buf_.stocks[s];
+            self->UpdateStockLabels(st.match_index, st.price, st.change_pct,
+                st.open, st.pre_close, st.high, st.low, st.amount, st.turnover);
+        }
+    }
+
+    // 标记数据已处理
+    self->stock_data_buf_.ready = false;
 }
 
 void CustomLcdDisplay::DataUpdateTask(void *arg) {
@@ -706,18 +746,25 @@ void CustomLcdDisplay::DataUpdateTask(void *arg) {
                                     }
                                 }
 
-                                // 最后才短暂获取锁，只做LVGL标签更新
-                                {
-                                    DisplayLockGuard lock(self);
-                                    self->UpdateStockIndexLabels(sh_index, sh_change, sz_index, sz_change, cy_index, cy_change, kc50_index, kc50_change);
-                                    for (int s = 0; s < 8; s++) {
-                                        if (parsed[s].match_index >= 0) {
-                                            self->UpdateStockLabels(parsed[s].match_index, parsed[s].price, parsed[s].change_pct,
-                                                parsed[s].open, parsed[s].pre_close, parsed[s].high, parsed[s].low,
-                                                parsed[s].amount, parsed[s].turnover);
-                                        }
-                                    }
+                                // 写入共享缓冲区（数据层），UI层定时器会读取并更新标签
+                                self->stock_data_buf_.sh_index = sh_index;
+                                self->stock_data_buf_.sh_change = sh_change;
+                                self->stock_data_buf_.sz_index = sz_index;
+                                self->stock_data_buf_.sz_change = sz_change;
+                                self->stock_data_buf_.cy_index = cy_index;
+                                self->stock_data_buf_.cy_change = cy_change;
+                                self->stock_data_buf_.kc50_index = kc50_index;
+                                self->stock_data_buf_.kc50_change = kc50_change;
+                                for (int s = 0; s < 8; s++) {
+                                    self->stock_data_buf_.stocks[s] = {
+                                        parsed[s].price, parsed[s].change_pct,
+                                        parsed[s].open, parsed[s].pre_close,
+                                        parsed[s].high, parsed[s].low,
+                                        parsed[s].amount, parsed[s].turnover,
+                                        parsed[s].match_index
+                                    };
                                 }
+                                self->stock_data_buf_.ready = true;
 
                                 if (any_alert) {
                                     app.PlaySound(Lang::Sounds::OGG_POPUP);
