@@ -504,8 +504,15 @@ void CustomLcdDisplay::SwitchToStockPage() {
 }
 
 void CustomLcdDisplay::SwitchToNextStock() {
+    // 防止快速按键时重复切换
+    if (stock_switching_) return;
+    stock_switching_ = true;
+
     DisplayLockGuard lock(this);
-    if (stock_list_count_ <= 0) return;
+    if (stock_list_count_ <= 0) {
+        stock_switching_ = false;
+        return;
+    }
 
     stock_current_index_ = (stock_current_index_ + 1) % stock_list_count_;
     const StockInfo &stock = stock_list_[stock_current_index_];
@@ -549,6 +556,10 @@ void CustomLcdDisplay::SwitchToNextStock() {
     UpdateStockLabels(stock_current_index_, stock.price, stock.change_pct,
                       stock.open, stock.pre_close, stock.high, stock.low,
                       stock.amount, stock.turnover);
+
+    // 允许下一次切换（短暂延迟防抖）
+    vTaskDelay(pdMS_TO_TICKS(50));
+    stock_switching_ = false;
 }
 
 void CustomLcdDisplay::AddStock(const char* code, const char* name) {

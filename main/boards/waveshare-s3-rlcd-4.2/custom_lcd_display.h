@@ -129,6 +129,7 @@ private:
     StockInfo stock_list_[STOCK_MAX_COUNT];
     int stock_list_count_ = 0;
     int stock_current_index_ = 0;
+    bool stock_switching_ = false;  // 防止快速按键时重复切换
 
     // 图片图标（不能用基类的 label，因为我们用 lv_image 而不是 Font Awesome 文字）
     lv_obj_t *wifi_icon_img_ = nullptr;
