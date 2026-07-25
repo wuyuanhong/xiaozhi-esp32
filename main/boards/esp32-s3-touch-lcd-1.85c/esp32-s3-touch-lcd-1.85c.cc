@@ -1,5 +1,6 @@
 #include "wifi_board.h"
 #include "codecs/no_audio_codec.h"
+#include "codecs/box_audio_codec.h"
 #include "display/lcd_display.h"
 #include "system_reset.h"
 #include "application.h"
@@ -274,7 +275,7 @@ private:
 
         esp_lcd_panel_io_spi_config_t io_config = {
             .cs_gpio_num = QSPI_PIN_NUM_LCD_CS,               
-            .dc_gpio_num = -1,                  
+            .dc_gpio_num = GPIO_NUM_NC,
             .spi_mode = 0,                     
             .pclk_hz = 3 * 1000 * 1000,      
             .trans_queue_depth = 10,            
@@ -336,12 +337,11 @@ private:
         }
         printf("------------------------------------- End of version selection------------------------------------- \r\n");
  
-        const esp_lcd_panel_dev_config_t panel_config = {
-            .reset_gpio_num = QSPI_PIN_NUM_LCD_RST,
-            .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB,     // Implemented by LCD command `36h`
-            .bits_per_pixel = QSPI_LCD_BIT_PER_PIXEL,    // Implemented by LCD command `3Ah` (16/18)
-            .vendor_config = &vendor_config,
-        };
+        esp_lcd_panel_dev_config_t panel_config = {};
+        panel_config.rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB;
+        panel_config.bits_per_pixel = QSPI_LCD_BIT_PER_PIXEL;
+        panel_config.reset_gpio_num = QSPI_PIN_NUM_LCD_RST;
+        panel_config.vendor_config = &vendor_config;
         ESP_ERROR_CHECK(esp_lcd_new_panel_st77916(panel_io, &panel_config, &panel));
 
         esp_lcd_panel_reset(panel);
@@ -376,12 +376,22 @@ public:
         GetBacklight()->RestoreBrightness();
     }
 
+    #ifdef CONFIG_VERSION_1_0
     virtual AudioCodec* GetAudioCodec() override {
         static NoAudioCodecSimplex audio_codec(AUDIO_INPUT_SAMPLE_RATE, AUDIO_OUTPUT_SAMPLE_RATE,
             AUDIO_I2S_SPK_GPIO_BCLK, AUDIO_I2S_SPK_GPIO_LRCK, AUDIO_I2S_SPK_GPIO_DOUT, I2S_STD_SLOT_LEFT, AUDIO_I2S_MIC_GPIO_SCK, AUDIO_I2S_MIC_GPIO_WS, AUDIO_I2S_MIC_GPIO_DIN, I2S_STD_SLOT_RIGHT); // I2S_STD_SLOT_LEFT / I2S_STD_SLOT_RIGHT / I2S_STD_SLOT_BOTH
 
         return &audio_codec;
     }
+    #endif
+
+    #ifdef CONFIG_VERSION_2_0
+    virtual AudioCodec* GetAudioCodec() override {
+        static BoxAudioCodec audio_codec(i2c_bus_, AUDIO_INPUT_SAMPLE_RATE, AUDIO_OUTPUT_SAMPLE_RATE,
+            AUDIO_I2S_GPIO_MCLK, AUDIO_I2S_GPIO_BCLK, AUDIO_I2S_GPIO_WS, AUDIO_I2S_GPIO_DOUT, AUDIO_I2S_GPIO_DIN, AUDIO_CODEC_PA_PIN, AUDIO_CODEC_ES8311_ADDR, AUDIO_CODEC_ES7210_ADDR, AUDIO_INPUT_REFERENCE);
+            return &audio_codec;
+    }
+    #endif
 
     virtual Display* GetDisplay() override {
         return display_;

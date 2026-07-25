@@ -1,10 +1,15 @@
+#include "sdkconfig.h"
+
+#if CONFIG_XIAOZHI_NETWORK_ETHERNET
+#include "ethernet_board.h"
+#else
 #include "wifi_board.h"
+#endif
 #include "codecs/es8311_audio_codec.h"
 #include "application.h"
 #include "display/lcd_display.h"
 // #include "display/no_display.h"
 #include "button.h"
-#include "config.h"
 
 #include "esp_video.h"
 #include "esp_video_init.h"
@@ -15,13 +20,21 @@
 #include "esp_ldo_regulator.h"
 
 #include "esp_lcd_mipi_dsi.h"
-#include "esp_lcd_jd9365_10_1.h"
+#include "esp_lcd_jd9365.h"
+#include "lcd_init_cmds.h"
+#include "config.h"
 
 #include <esp_log.h>
 #include <driver/i2c_master.h>
 #include <esp_lvgl_port.h>
 #include "esp_lcd_touch_gt911.h"
 #define TAG "WaveshareEsp32p4nano"
+
+#if CONFIG_XIAOZHI_NETWORK_ETHERNET
+using WaveshareEsp32p4nanoBase = EthernetBoard;
+#else
+using WaveshareEsp32p4nanoBase = WifiBoard;
+#endif
 
 class CustomBacklight : public Backlight {
 public:
@@ -33,11 +46,7 @@ protected:
 
     virtual void SetBrightnessImpl(uint8_t brightness) override {
         uint8_t i2c_address = 0x45;     // 7-bit address
-#if CONFIG_LCD_TYPE_800_1280_10_1_INCH
-        uint8_t reg = 0x86;
-#elif CONFIG_LCD_TYPE_800_1280_10_1_INCH_A
         uint8_t reg = 0x96;
-#endif
         uint8_t data[2] = {reg, brightness};
 
         i2c_master_dev_handle_t dev_handle;
@@ -64,7 +73,7 @@ protected:
     }
 };
 
-class WaveshareEsp32p4nano : public WifiBoard {
+class WaveshareEsp32p4nano : public WaveshareEsp32p4nanoBase {
 private:
     i2c_master_bus_handle_t codec_i2c_bus_;
     Button boot_button_;
@@ -105,6 +114,23 @@ private:
     }
 
     void InitializeLCD() {
+        uint8_t chip_addr = 0x45;
+        uint8_t write_cmds[4][2] = {{0x95, 0x11}, {0x95, 0x17}, {0x96, 0x00}, {0x96, 0xFF}};
+        i2c_device_config_t i2c_dev_conf = {
+            .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+            .device_address = chip_addr,
+            .scl_speed_hz = 100000,
+        };
+        i2c_master_dev_handle_t dev_handle = NULL;
+        if (i2c_master_bus_add_device(codec_i2c_bus_, &i2c_dev_conf, &dev_handle) == ESP_OK)
+        {
+            for (uint8_t i = 0; i < 4; i++)
+            {
+                i2c_master_transmit(dev_handle, write_cmds[i], 2, 50);
+            }
+            i2c_master_bus_rm_device(dev_handle);
+        }
+
         bsp_enable_dsi_phy_power();
         esp_lcd_panel_io_handle_t io = NULL;
         esp_lcd_panel_handle_t disp_panel = NULL;
@@ -125,7 +151,8 @@ private:
         esp_lcd_dpi_panel_config_t dpi_config = {
             .dpi_clk_src = MIPI_DSI_DPI_CLK_SRC_DEFAULT,
             .dpi_clock_freq_mhz = 80,
-            .pixel_format = LCD_COLOR_PIXEL_FORMAT_RGB565,
+            .in_color_format = LCD_COLOR_FMT_RGB565,
+            .out_color_format = LCD_COLOR_FMT_RGB565,
             .num_fbs = 1,
             .video_timing = {
                 .h_size = 800,
@@ -137,27 +164,22 @@ private:
                 .vsync_back_porch = 4,
                 .vsync_front_porch = 30,
             },
-            .flags = {
-                .use_dma2d = true,
-            },
         };
 
         jd9365_vendor_config_t vendor_config = {
-
+            .init_cmds = lcd_init_cmds,
+            .init_cmds_size = sizeof(lcd_init_cmds) / sizeof(lcd_init_cmds[0]),
             .mipi_config = {
                 .dsi_bus = mipi_dsi_bus,
                 .dpi_config = &dpi_config,
                 .lane_num = 2,
             },
-            .flags = {
-                .use_mipi_interface = 1,
-            },
         };
 
         const esp_lcd_panel_dev_config_t lcd_dev_config = {
-            .reset_gpio_num = PIN_NUM_LCD_RST,
             .rgb_ele_order = LCD_RGB_ELEMENT_ORDER_RGB,
             .bits_per_pixel = 16,
+            .reset_gpio_num = PIN_NUM_LCD_RST,
             .vendor_config = &vendor_config,
         };
         esp_lcd_new_panel_jd9365(io, &lcd_dev_config, &disp_panel);
@@ -188,7 +210,16 @@ private:
             },
         };
         esp_lcd_panel_io_handle_t tp_io_handle = NULL;
-        esp_lcd_panel_io_i2c_config_t tp_io_config = ESP_LCD_TOUCH_IO_I2C_GT911_CONFIG();
+        esp_lcd_panel_io_i2c_config_t tp_io_config = {
+            .dev_addr = ESP_LCD_TOUCH_IO_I2C_GT911_ADDRESS, 
+            .control_phase_bytes = 1,
+            .dc_bit_offset = 0,
+            .lcd_cmd_bits = 16,                            
+            .flags =
+            {
+                .disable_control_phase = 1,
+            }
+	    };
         tp_io_config.scl_speed_hz = 100 * 1000;
         ESP_ERROR_CHECK(esp_lcd_new_panel_io_i2c(codec_i2c_bus_, &tp_io_config, &tp_io_handle));
         ESP_LOGI(TAG, "Initialize touch controller");
@@ -220,12 +251,18 @@ private:
     void InitializeButtons() {
         boot_button_.OnClick([this]() {
             auto& app = Application::GetInstance();
+#if CONFIG_XIAOZHI_NETWORK_ETHERNET
+            if (app.GetDeviceState() != kDeviceStateStarting) {
+                app.ToggleChatState();
+            }
+#else
             // During startup (before connected), pressing BOOT button enters Wi-Fi config mode without reboot
             if (app.GetDeviceState() == kDeviceStateStarting) {
                 EnterWifiConfigMode();
                 return;
             }
             app.ToggleChatState();
+#endif
         });
     }
 

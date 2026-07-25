@@ -15,11 +15,35 @@
 
 #define TAG "YunliaoS3"
 
+class YunliaoDisplay : public SpiLcdDisplay {
+public:
+    YunliaoDisplay(esp_lcd_panel_io_handle_t io_handle,
+                     esp_lcd_panel_handle_t panel_handle,
+                     int width,
+                     int height,
+                     int offset_x,
+                     int offset_y,
+                     bool mirror_x,
+                     bool mirror_y,
+                     bool swap_xy)
+        : SpiLcdDisplay(io_handle, panel_handle, width, height, offset_x, offset_y, mirror_x, mirror_y, swap_xy) {
+    }
+
+    virtual void SetupUI() override {
+        SpiLcdDisplay::SetupUI();
+        auto& theme_manager = LvglThemeManager::GetInstance();
+        auto theme = theme_manager.GetTheme("dark");
+        if (theme != nullptr) {
+            SetTheme(theme);
+        }
+    }
+};
+
 class YunliaoS3 : public DualNetworkBoard {
    private:
     i2c_master_bus_handle_t codec_i2c_bus_;
     Button boot_button_;
-    SpiLcdDisplay* display_;
+    YunliaoDisplay* display_;
     PowerSaveTimer* power_save_timer_;
     PowerManager* power_manager_;
 
@@ -83,6 +107,11 @@ class YunliaoS3 : public DualNetworkBoard {
             if (app.GetDeviceState() == kDeviceStateStarting ||
                 app.GetDeviceState() == kDeviceStateWifiConfiguring) {
                 SwitchNetworkType();
+            }else if(app.GetDeviceState() == kDeviceStateIdle){
+                bool enableAec = app.GetAecMode() == kAecOff;
+                SetAecMode(enableAec);
+                Settings settings("aec", true);
+                settings.SetInt("mode", enableAec);
             }
         });
         boot_button_.OnMultipleClick(
@@ -107,8 +136,8 @@ class YunliaoS3 : public DualNetworkBoard {
         // 液晶屏控制IO初始化
         ESP_LOGD(TAG, "Install panel IO");
         esp_lcd_panel_io_spi_config_t io_config = {};
-        io_config.cs_gpio_num = DISPLAY_SPI_PIN_LCD_CS;
-        io_config.dc_gpio_num = DISPLAY_SPI_PIN_LCD_DC;
+        io_config.cs_gpio_num = static_cast<gpio_num_t>(DISPLAY_SPI_PIN_LCD_CS);
+        io_config.dc_gpio_num = static_cast<gpio_num_t>(DISPLAY_SPI_PIN_LCD_DC);
         io_config.spi_mode = 3;
         io_config.pclk_hz = DISPLAY_SPI_CLOCK_HZ;
         io_config.trans_queue_depth = 10;
@@ -122,7 +151,7 @@ class YunliaoS3 : public DualNetworkBoard {
         Settings settings("display", false);
         bool currentIpsMode = settings.GetBool("ips_mode", DISPLAY_INVERT_COLOR);
         esp_lcd_panel_dev_config_t panel_config = {};
-        panel_config.reset_gpio_num = DISPLAY_SPI_PIN_LCD_RST;
+        panel_config.reset_gpio_num = static_cast<gpio_num_t>(DISPLAY_SPI_PIN_LCD_RST);
         panel_config.rgb_ele_order = DISPLAY_RGB_ORDER_COLOR;
         panel_config.bits_per_pixel = 16;
         ESP_ERROR_CHECK(
@@ -133,15 +162,10 @@ class YunliaoS3 : public DualNetworkBoard {
         esp_lcd_panel_invert_color(panel, currentIpsMode);
         esp_lcd_panel_swap_xy(panel, DISPLAY_SWAP_XY);
         esp_lcd_panel_mirror(panel, DISPLAY_MIRROR_X, DISPLAY_MIRROR_Y);
-        display_ = new SpiLcdDisplay(panel_io, panel, DISPLAY_WIDTH,
+        display_ = new YunliaoDisplay(panel_io, panel, DISPLAY_WIDTH,
                                      DISPLAY_HEIGHT, DISPLAY_OFFSET_X,
                                      DISPLAY_OFFSET_Y, DISPLAY_MIRROR_X,
                                      DISPLAY_MIRROR_Y, DISPLAY_SWAP_XY);
-        auto& theme_manager = LvglThemeManager::GetInstance();
-        auto theme = theme_manager.GetTheme("dark");
-        if (theme != nullptr) {
-            display_->SetTheme(theme);
-        }
     }
     void InitializeTools(){
         auto& mcp_server = McpServer::GetInstance();
@@ -153,6 +177,8 @@ class YunliaoS3 : public DualNetworkBoard {
             }), [this](const PropertyList& properties) {
                 bool enable = properties["enable"].value<bool>();
                 SetAecMode(enable);
+                Settings settings("aec", true);
+                settings.SetInt("mode", enable);
                 return true;
             });
 
@@ -169,8 +195,6 @@ class YunliaoS3 : public DualNetworkBoard {
         app.StopListening();
         app.SetDeviceState(kDeviceStateIdle);
         app.SetAecMode(newMode);
-        Settings settings("aec", true);
-        settings.SetInt("mode", newMode);
     }
     void SwitchTFT() {
         Settings settings("display", true);
@@ -203,11 +227,6 @@ class YunliaoS3 : public DualNetworkBoard {
                 }
             }
         });
-        if (GetNetworkType() == NetworkType::WIFI) {
-            power_manager_->Shutdown4G();
-        } else {
-            power_manager_->Start4G();
-        }
         GetBacklight()->RestoreBrightness();
         while (gpio_get_level(BOOT_BUTTON_PIN) == 0) {
             vTaskDelay(pdMS_TO_TICKS(10));
@@ -216,6 +235,27 @@ class YunliaoS3 : public DualNetworkBoard {
         Settings settings("aec", false);
         auto& app = Application::GetInstance();
         app.SetAecMode(settings.GetInt("mode",kAecOnDeviceSide) == kAecOnDeviceSide ? kAecOnDeviceSide : kAecOff);
+        power_manager_->Start4G();
+        if (GetNetworkType() == NetworkType::WIFI) {
+            power_manager_->Disable4G();
+        }else{
+            power_manager_->Enable4G();
+        }
+        power_manager_->OnBtLinkStatusChanged([this](bool is_connected) {
+            auto& app = Application::GetInstance();
+            if (is_connected) {
+                if (app.GetAecMode() != kAecOff) {
+                    SetAecMode(false);
+                }
+            } else {
+                Settings settings("aec", false);
+                int storedMode = settings.GetInt("mode", kAecOnDeviceSide);
+                if (storedMode != kAecOff && app.GetAecMode() == kAecOff) {
+                    SetAecMode(storedMode == kAecOnDeviceSide);
+                }
+            }
+        });
+        power_manager_->InitializeBtModul();
         InitializeTools();
     }
 

@@ -8,27 +8,19 @@
 
 ## 基础使用
 
-* idf version: v6.0-dev
+* idf version: v5.5.2 or above (recommended: v6.0.2)
 
-1. 调整 idf_component.yml
+* No dependency override needed — the project already specifies the correct `esp_video` and `esp_ipa` versions in `main/idf_component.yml`. Do NOT change the dependency versions unless you are also modifying the source code to match the older API.
 
-将
-```yaml
-  espressif/esp_video:
-    version: ==1.3.1   # for compatibility. update version may need to modify this project code.
-    rules:
-    - if: target not in [esp32]
-```
-修改为
-```yaml
-  espressif/esp_video:
-    version: '==0.7.0'
-    rules:
-    - if: target not in [esp32]
-  espressif/esp_ipa: '==0.1.0'
-```
+`release.py` 会根据当前 ESP-IDF 版本选择芯片版本：
 
-2. 使用 release.py 编译
+- `m5stack-tab5` 面向 Rev < 3，并包含 `CONFIG_ESP32P4_SELECTS_REV_LESS_V3=y` 和 `CONFIG_ESP32P4_REV_MIN_100=y`。
+- `m5stack-tab5-p4x` 面向 Rev >= 3。
+- ESP-IDF 6 构建需要 `esp-sr` 2.4.7 或更高版本，两个芯片修订版均可用。
+
+不要把 `m5stack-tab5-p4x` 固件强制刷入 Rev 1.x 芯片；应改用无后缀的 `m5stack-tab5` 固件。误用 P4X 固件时，正常情况下烧录工具会报告：`bootloader/bootloader.bin requires chip revision in range [v3.0 - v3.99] (this chip is revision v1.x)`。
+
+1. 使用 release.py 编译
 
 ```shell
 python ./scripts/release.py m5stack-tab5
@@ -36,7 +28,7 @@ python ./scripts/release.py m5stack-tab5
 
 如需手动编译，请参考 `m5stack-tab5/config.json` 修改 menuconfig 对应选项。
 
-3. 编译烧录程序
+2. 编译烧录程序
 
 ```shell
 idf.py flash monitor
@@ -53,5 +45,3 @@ idf.py flash monitor
 1. listening... 需要等几秒才能获取语音输入???
 2. 亮度调节不对
 3. 音量调节不对
- 
-## TODO

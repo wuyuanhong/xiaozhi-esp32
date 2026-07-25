@@ -8,6 +8,7 @@
 #include "i2c_device.h"
 #include "esp32_camera.h"
 #include "mcp_server.h"
+#include "press_to_talk_mcp_tool.h"
 
 #include <esp_log.h>
 #include <esp_lcd_panel_vendor.h>
@@ -38,21 +39,15 @@ private:
     Pca9557* pca9557_;
 
 public:
-    CustomAudioCodec(i2c_master_bus_handle_t i2c_bus, Pca9557* pca9557) 
-        : BoxAudioCodec(i2c_bus, 
-                       AUDIO_INPUT_SAMPLE_RATE, 
-                       AUDIO_OUTPUT_SAMPLE_RATE,
-                       AUDIO_I2S_GPIO_MCLK, 
-                       AUDIO_I2S_GPIO_BCLK, 
-                       AUDIO_I2S_GPIO_WS, 
-                       AUDIO_I2S_GPIO_DOUT, 
-                       AUDIO_I2S_GPIO_DIN,
-                       GPIO_NUM_NC, 
-                       AUDIO_CODEC_ES8311_ADDR, 
-                       AUDIO_CODEC_ES7210_ADDR, 
-                       AUDIO_INPUT_REFERENCE),
-          pca9557_(pca9557) {
-    }
+    CustomAudioCodec(i2c_master_bus_handle_t i2c_bus, Pca9557* pca9557)
+        : BoxAudioCodec(i2c_bus, AUDIO_INPUT_SAMPLE_RATE, AUDIO_OUTPUT_SAMPLE_RATE,
+                        AUDIO_I2S_GPIO_MCLK, AUDIO_I2S_GPIO_BCLK, AUDIO_I2S_GPIO_WS,
+                        AUDIO_I2S_GPIO_DOUT, AUDIO_I2S_GPIO_DIN, GPIO_NUM_NC,
+                        AUDIO_CODEC_ES8311_ADDR, AUDIO_CODEC_ES7210_ADDR, AUDIO_INPUT_REFERENCE,
+                        28.0f,  // Physical MIC1 gain
+                        2,      // Physical MIC3 is the playback reference input
+                        0.0f),
+          pca9557_(pca9557) {}
 
     virtual void EnableOutput(bool enable) override {
         BoxAudioCodec::EnableOutput(enable);
@@ -72,6 +67,7 @@ private:
     Display* display_;
     Pca9557* pca9557_;
     Esp32Camera* camera_;
+    PressToTalkMcpTool* press_to_talk_tool_ = nullptr;
 
     void InitializeI2c() {
         // Initialize I2C peripheral
@@ -112,7 +108,21 @@ private:
                 EnterWifiConfigMode();
                 return;
             }
-            app.ToggleChatState();
+            // In press-to-talk mode the click event is handled by press down/up
+            if (!press_to_talk_tool_ || !press_to_talk_tool_->IsPressToTalkEnabled()) {
+                app.ToggleChatState();
+            }
+        });
+
+        boot_button_.OnPressDown([this]() {
+            if (press_to_talk_tool_ && press_to_talk_tool_->IsPressToTalkEnabled()) {
+                Application::GetInstance().StartListening();
+            }
+        });
+        boot_button_.OnPressUp([this]() {
+            if (press_to_talk_tool_ && press_to_talk_tool_->IsPressToTalkEnabled()) {
+                Application::GetInstance().StopListening();
+            }
         });
 
 #if CONFIG_USE_DEVICE_AEC
@@ -184,7 +194,16 @@ private:
             },
         };
         esp_lcd_panel_io_handle_t tp_io_handle = NULL;
-        esp_lcd_panel_io_i2c_config_t tp_io_config = ESP_LCD_TOUCH_IO_I2C_FT5x06_CONFIG();
+        esp_lcd_panel_io_i2c_config_t tp_io_config = {
+            .dev_addr = ESP_LCD_TOUCH_IO_I2C_FT5x06_ADDRESS,
+            .control_phase_bytes = 1,
+            .dc_bit_offset = 0,
+            .lcd_cmd_bits = 8,
+            .flags =
+            {
+                .disable_control_phase = 1,
+            }
+        };
         tp_io_config.scl_speed_hz = 400000;
 
         esp_lcd_new_panel_io_i2c(i2c_bus_, &tp_io_config, &tp_io_handle);
@@ -248,6 +267,10 @@ private:
                 EnterWifiConfigMode();
                 return true;
             });
+
+        // Allow switching between press-to-talk (长按说话) and click-to-talk (单击唤醒)
+        press_to_talk_tool_ = new PressToTalkMcpTool();
+        press_to_talk_tool_->Initialize();
     }
 
 public:

@@ -12,6 +12,7 @@
 #include <map>
 #include <memory>
 #include <atomic>
+#include <functional>
 
 #include "protocol.h"
 #include "ota.h"
@@ -33,6 +34,7 @@
 #define MAIN_EVENT_START_LISTENING      (1 << 10)
 #define MAIN_EVENT_STOP_LISTENING       (1 << 11)
 #define MAIN_EVENT_STATE_CHANGED        (1 << 12)
+#define MAIN_EVENT_PLAYBACK_DRAINED     (1 << 13)
 
 
 enum AecMode {
@@ -110,6 +112,7 @@ public:
     bool UpgradeFirmware(const std::string& url, const std::string& version = "");
     bool CanEnterSleepMode();
     void SendMcpMessage(const std::string& payload);
+    void RegisterMcpBroadcastCallback(std::function<void(const std::string&)> callback);
     void SetAecMode(AecMode mode);
     AecMode GetAecMode() const { return aec_mode_; }
     void PlaySound(const std::string_view& sound);
@@ -147,21 +150,24 @@ private:
     AudioService audio_service_;
     std::unique_ptr<Ota> ota_;
 
+    std::function<void(const std::string&)> mcp_broadcast_callback_;
+
     bool has_server_time_ = false;
     bool aborted_ = false;
     bool assets_version_checked_ = false;
     bool play_popup_on_listening_ = false;  // Flag to play popup sound after state changes to listening
     std::atomic<bool> music_playing_{false};
     std::atomic<bool> stop_music_playback_{false};
-    std::atomic<uint32_t> music_progress_ms_{0};  // 当前播放位置（毫秒），供 MCP 查询
-    std::atomic<uint32_t> music_total_ms_{0};     // 歌曲总时长（毫秒，来自歌词末尾时间戳）
+    std::atomic<uint32_t> music_progress_ms_{0};
+    std::atomic<uint32_t> music_total_ms_{0};
     TaskHandle_t music_playback_task_handle_ = nullptr;
     std::string current_music_title_;
-    std::string current_music_url_;             // 当前播放的 URL（供 MCP 查询）
-    std::string last_played_url_;               // 上一次播放的 URL（防重播用）
-    int64_t last_play_finished_ms_ = 0;         // 上一次播放结束的时间戳（毫秒）
+    std::string current_music_url_;
+    std::string last_played_url_;
+    int64_t last_play_finished_ms_ = 0;
     std::mutex music_playback_mutex_;
 
+    bool pending_listening_start_ = false;
     int clock_ticks_ = 0;
     TaskHandle_t activation_task_handle_ = nullptr;
 
@@ -176,7 +182,10 @@ private:
     void HandleActivationDoneEvent();
     void HandleWakeWordDetectedEvent();
     void ContinueOpenAudioChannel(ListeningMode mode);
+    void BeginWakeWordInvoke(const std::string& wake_word);
     void ContinueWakeWordInvoke(const std::string& wake_word);
+    void StartListeningAudio();
+    void ConfigureWakeWordForListening();
 
     // Activation task (runs in background)
     void ActivationTask();
