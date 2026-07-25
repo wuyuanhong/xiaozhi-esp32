@@ -55,6 +55,7 @@ void CustomLcdDisplay::StartDataUpdateTask() {
     // 启动 UI 更新定时器（每 500ms 检查一次是否有新数据）
     esp_timer_create_args_t timer_args = {
         .callback = StockUITimerCallback,
+        .arg = this,
         .name = "stock_ui_timer"
     };
     esp_timer_create(&timer_args, &stock_ui_timer_);
