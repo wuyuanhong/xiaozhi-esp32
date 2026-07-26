@@ -23,11 +23,11 @@
 #include <esp_log.h>
 
 // 字体声明
-LV_FONT_DECLARE(font_noto_sans_basic_16_4);
+LV_FONT_DECLARE(font_puhui_16_4);
 LV_FONT_DECLARE(alibaba_puhui_24);
 LV_FONT_DECLARE(alibaba_black_64);
-LV_FONT_DECLARE(font_noto_sans_basic_16_4);
-LV_FONT_DECLARE(font_noto_sans_basic_16_4);
+LV_FONT_DECLARE(font_puhui_16_4);
+LV_FONT_DECLARE(font_puhui_16_4);
 
 // 状态栏图标
 LV_IMAGE_DECLARE(ui_img_wifi);
@@ -40,11 +40,11 @@ void CustomLcdDisplay::SetupPomodoroUI() {
     DisplayLockGuard lock(this);
 
     lv_obj_t *root = lv_screen_active();
-    const lv_font_t *font_num    = &font_noto_sans_basic_16_4;
+    const lv_font_t *font_num    = &font_puhui_16_4;
     const lv_font_t *font_time   = &alibaba_puhui_24;
     const lv_font_t *font_big    = &alibaba_black_64;
-    const lv_font_t *font_cn     = &font_noto_sans_basic_16_4;
-    const lv_font_t *font_sm     = &font_noto_sans_basic_16_4;
+    const lv_font_t *font_cn     = &font_puhui_16_4;
+    const lv_font_t *font_sm     = &font_puhui_16_4;
 
     const int SCR_W = 400;
     const int SCR_H = 300;

@@ -13,14 +13,14 @@
 #include <esp_log.h>
 
 // 声明天气站专用字体（从 MyWeatherStation 移植，字符集有限但够天气站用）
-LV_FONT_DECLARE(font_noto_sans_basic_16_4);
+LV_FONT_DECLARE(font_puhui_16_4);
 LV_FONT_DECLARE(alibaba_puhui_24);
 LV_FONT_DECLARE(alibaba_puhui_48);
 LV_FONT_DECLARE(alibaba_black_64);
 
 // 声明小智自带字体（7415 个常用汉字，用于 AI 对话区域）
-LV_FONT_DECLARE(font_noto_sans_basic_16_4);  // 16px 标准字体
-LV_FONT_DECLARE(font_noto_sans_basic_16_4);  // 14px 小字体（用于系统信息显示）
+LV_FONT_DECLARE(font_puhui_16_4);  // 16px 标准字体
+LV_FONT_DECLARE(font_puhui_16_4);  // 14px 小字体（用于系统信息显示）
 
 // 声明状态栏图标（从 MyWeatherStation 移植）
 LV_IMAGE_DECLARE(ui_img_wifi);
@@ -49,12 +49,12 @@ void CustomLcdDisplay::SetupWeatherUI() {
 
     lv_obj_t *screen = weather_page_;
 
-    const lv_font_t *font_small  = &font_noto_sans_basic_16_4;
+    const lv_font_t *font_small  = &font_puhui_16_4;
     const lv_font_t *font_normal = &alibaba_puhui_24;
     const lv_font_t *font_large  = &alibaba_puhui_48;
     const lv_font_t *font_clock  = &alibaba_black_64;
     // 小智完整字库（7415 常用汉字，AI 对话区域专用）
-    const lv_font_t *font_ai     = &font_noto_sans_basic_16_4;
+    const lv_font_t *font_ai     = &font_puhui_16_4;
 
     // ===== 状态栏（右上角白底胶囊）=====
     lv_obj_t *status_bar = lv_obj_create(screen);
@@ -173,9 +173,9 @@ void CustomLcdDisplay::SetupWeatherUI() {
     lv_obj_center(date_num_label_);
     lv_label_set_text(date_num_label_, "--");
 
-    // 天气标签（用 font_noto_sans_basic_16_4 完整字库，支持更多城市名）
+    // 天气标签（用 font_puhui_16_4 完整字库，支持更多城市名）
     weather_label_ = lv_label_create(calendar_card);
-    lv_obj_set_style_text_font(weather_label_, &font_noto_sans_basic_16_4, 0);
+    lv_obj_set_style_text_font(weather_label_, &font_puhui_16_4, 0);
     lv_obj_set_style_text_color(weather_label_, lv_color_white(), 0);
     lv_obj_set_style_text_align(weather_label_, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_width(weather_label_, right_w - 10);
