@@ -21,7 +21,7 @@
 #include "managers/pomodoro_manager.h"
 
 // 声明小智字体（用于系统信息显示时临时切换字体大小）
-LV_FONT_DECLARE(font_noto_sans_basic_14_1);
+LV_FONT_DECLARE(font_noto_sans_basic_16_4);
 LV_FONT_DECLARE(font_noto_sans_basic_16_4);
 #include "managers/weather_manager.h"
 

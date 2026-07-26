@@ -1428,49 +1428,54 @@ void Application::MusicPlaybackTask(std::string url, std::string title, std::str
     size_t total_output_samples = 0;
 
     auto http = network->CreateHttp(3);
-    do {
+
+    // 跟随 302 重定向（最多 3 次），解决 163 音乐等 CDN 跳转问题
+    for (int redirect = 0; redirect < 3 && !playback_failed; redirect++) {
         http->SetHeader("User-Agent", SystemInfo::GetUserAgent());
-        // QQ 音乐 CDN 防盗链：需要 Referer 头才能获取 MP3 流
         if (url.find("qqmusic") != std::string::npos || url.find("qq.com") != std::string::npos) {
             http->SetHeader("Referer", "https://y.qq.com/");
         }
-
         if (!http->Open("GET", url)) {
             ESP_LOGE(TAG, "播放音乐失败：无法打开 URL: %s", url.c_str());
             playback_failed = true;
-            Schedule([display]() {
-                // 音乐页可见时，必须把失败信息写到歌词区，避免用户看不到弹窗。
-                display->SetMusicLyric("播放失败：链接无效或网络异常");
-                display->SetMusicProgress(0, 1);
-                display->ShowNotification("音乐播放失败：网络连接异常");
-            });
             notify_failed = true;
-            break;
+            continue;
         }
-        if (http->GetStatusCode() != 200) {
-            ESP_LOGE(TAG, "播放音乐失败：HTTP 状态码 %d", http->GetStatusCode());
-            playback_failed = true;
-            Schedule([display]() {
-                // 资源不可用时，同步更新音乐页提示，避免只在通知区显示。
-                display->SetMusicLyric("播放失败：资源不可用");
-                display->SetMusicProgress(0, 1);
-                display->ShowNotification("音乐播放失败：资源不可用");
-            });
-            notify_failed = true;
-            break;
+        int status = http->GetStatusCode();
+        if (status == 200) break;
+        if (status == 301 || status == 302) {
+            std::string location = http->GetResponseHeader("location");
+            http->Close();
+            if (location.empty()) {
+                ESP_LOGE(TAG, "播放音乐失败：HTTP %d 无 Location 头", status);
+                playback_failed = true;
+                notify_failed = true;
+                continue;
+            }
+            ESP_LOGI(TAG, "HTTP %d -> 重定向到: %s", status, location.c_str());
+            url = location;
+            http = network->CreateHttp(3);
+            continue;
         }
+        ESP_LOGE(TAG, "播放音乐失败：HTTP 状态码 %d", status);
+        playback_failed = true;
+        notify_failed = true;
+    }
+    if (playback_failed) goto cleanup;
+
+    {
 
         ret = esp_audio_dec_register_default();
         if (ret != ESP_AUDIO_ERR_OK) {
             ESP_LOGE(TAG, "注册默认解码器失败: %d", ret);
             playback_failed = true;
-            break;
+            goto cleanup;
         }
         ret = esp_audio_simple_dec_register_default();
         if (ret != ESP_AUDIO_ERR_OK) {
             ESP_LOGE(TAG, "注册简单解码器失败: %d", ret);
             playback_failed = true;
-            break;
+            goto cleanup;
         }
         decoder_registered = true;
 
@@ -1484,7 +1489,7 @@ void Application::MusicPlaybackTask(std::string url, std::string title, std::str
         if (ret != ESP_AUDIO_ERR_OK || decoder == nullptr) {
             ESP_LOGE(TAG, "打开 MP3 解码器失败: %d", ret);
             playback_failed = true;
-            break;
+            goto cleanup;
         }
 
         if (!codec->output_enabled()) {
@@ -1496,7 +1501,7 @@ void Application::MusicPlaybackTask(std::string url, std::string title, std::str
         if (in_buf == nullptr || out_buf == nullptr) {
             ESP_LOGE(TAG, "内存不足，无法播放音乐");
             playback_failed = true;
-            break;
+            goto cleanup;
         }
 
         while (!stop_music_playback_.load()) {
@@ -1666,8 +1671,9 @@ void Application::MusicPlaybackTask(std::string url, std::string title, std::str
                 break;
             }
         }
-    } while (false);
+    }
 
+cleanup:
     if (music_resampler != nullptr) {
         esp_ae_rate_cvt_close(music_resampler);
     }

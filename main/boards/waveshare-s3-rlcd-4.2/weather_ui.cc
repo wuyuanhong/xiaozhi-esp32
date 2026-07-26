@@ -13,14 +13,14 @@
 #include <esp_log.h>
 
 // 声明天气站专用字体（从 MyWeatherStation 移植，字符集有限但够天气站用）
-LV_FONT_DECLARE(alibaba_puhui_16);
+LV_FONT_DECLARE(font_noto_sans_basic_16_4);
 LV_FONT_DECLARE(alibaba_puhui_24);
 LV_FONT_DECLARE(alibaba_puhui_48);
 LV_FONT_DECLARE(alibaba_black_64);
 
 // 声明小智自带字体（7415 个常用汉字，用于 AI 对话区域）
 LV_FONT_DECLARE(font_noto_sans_basic_16_4);  // 16px 标准字体
-LV_FONT_DECLARE(font_noto_sans_basic_14_1);  // 14px 小字体（用于系统信息显示）
+LV_FONT_DECLARE(font_noto_sans_basic_16_4);  // 14px 小字体（用于系统信息显示）
 
 // 声明状态栏图标（从 MyWeatherStation 移植）
 LV_IMAGE_DECLARE(ui_img_wifi);
@@ -49,7 +49,7 @@ void CustomLcdDisplay::SetupWeatherUI() {
 
     lv_obj_t *screen = weather_page_;
 
-    const lv_font_t *font_small  = &alibaba_puhui_16;
+    const lv_font_t *font_small  = &font_noto_sans_basic_16_4;
     const lv_font_t *font_normal = &alibaba_puhui_24;
     const lv_font_t *font_large  = &alibaba_puhui_48;
     const lv_font_t *font_clock  = &alibaba_black_64;

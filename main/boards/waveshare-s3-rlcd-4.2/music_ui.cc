@@ -26,10 +26,10 @@
 #include <esp_log.h>
 
 // 字体：只用小智自带完整字库 + 天气站字体（仅用于非中文场景如时间数字）
-LV_FONT_DECLARE(alibaba_puhui_16);   // 16px（用于时间数字、电量等纯 ASCII 场景）
+LV_FONT_DECLARE(font_noto_sans_basic_16_4);   // 16px（用于时间数字、电量等纯 ASCII 场景）
 LV_FONT_DECLARE(alibaba_puhui_24);   // 24px（用于时钟数字）
 LV_FONT_DECLARE(font_noto_sans_basic_16_4);    // 16px 小智完整字库（所有中文文字用这个）
-LV_FONT_DECLARE(font_noto_sans_basic_14_1);    // 14px 小字体
+LV_FONT_DECLARE(font_noto_sans_basic_16_4);    // 14px 小字体
 
 // 状态栏图标
 LV_IMAGE_DECLARE(ui_img_wifi);
@@ -42,10 +42,10 @@ void CustomLcdDisplay::SetupMusicUI() {
     DisplayLockGuard lock(this);
 
     lv_obj_t *root = lv_screen_active();
-    const lv_font_t *font_num    = &alibaba_puhui_16;   // 纯数字/ASCII 用
+    const lv_font_t *font_num    = &font_noto_sans_basic_16_4;   // 纯数字/ASCII 用
     const lv_font_t *font_time   = &alibaba_puhui_24;   // 时钟数字
     const lv_font_t *font_cn     = &font_noto_sans_basic_16_4;    // 所有中文文字统一用这个
-    const lv_font_t *font_sm     = &font_noto_sans_basic_14_1;    // 14px 小字
+    const lv_font_t *font_sm     = &font_noto_sans_basic_16_4;    // 14px 小字
 
     // 全局布局常量
     const int SCR_W = 400;
