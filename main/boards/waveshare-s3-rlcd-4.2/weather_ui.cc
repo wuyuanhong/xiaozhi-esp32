@@ -13,14 +13,10 @@
 #include <esp_log.h>
 
 // 声明天气站专用字体（从 MyWeatherStation 移植，字符集有限但够天气站用）
-LV_FONT_DECLARE(font_puhui_16_4);
-LV_FONT_DECLARE(alibaba_puhui_24);
-LV_FONT_DECLARE(alibaba_puhui_48);
+LV_FONT_DECLARE(font_puhui_16_4);             // 4bpp 完整中文字库（7415 汉字）
+LV_FONT_DECLARE(font_noto_sans_basic_14_1);  // 1bpp 字体，单色屏上小细节（°的圆圈）不会丢失
+LV_FONT_DECLARE(font_noto_sans_basic_20_4);
 LV_FONT_DECLARE(alibaba_black_64);
-
-// 声明小智自带字体（7415 个常用汉字，用于 AI 对话区域）
-LV_FONT_DECLARE(font_puhui_16_4);  // 16px 标准字体
-LV_FONT_DECLARE(font_puhui_16_4);  // 14px 小字体（用于系统信息显示）
 
 // 声明状态栏图标（从 MyWeatherStation 移植）
 LV_IMAGE_DECLARE(ui_img_wifi);
@@ -49,9 +45,9 @@ void CustomLcdDisplay::SetupWeatherUI() {
 
     lv_obj_t *screen = weather_page_;
 
-    const lv_font_t *font_small  = &font_puhui_16_4;
-    const lv_font_t *font_normal = &alibaba_puhui_24;
-    const lv_font_t *font_large  = &alibaba_puhui_48;
+    const lv_font_t *font_small  = &font_noto_sans_basic_14_1;  // 1bpp，单色屏上°的圆圈能正常显示
+    const lv_font_t *font_normal = &font_noto_sans_basic_20_4;
+    const lv_font_t *font_large  = &font_noto_sans_basic_20_4;
     const lv_font_t *font_clock  = &alibaba_black_64;
     // 小智完整字库（7415 常用汉字，AI 对话区域专用）
     const lv_font_t *font_ai     = &font_puhui_16_4;
