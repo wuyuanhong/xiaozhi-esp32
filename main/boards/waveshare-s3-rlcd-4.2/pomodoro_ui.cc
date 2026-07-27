@@ -23,9 +23,7 @@
 #include <esp_log.h>
 
 // 字体声明
-LV_FONT_DECLARE(font_puhui_16_4);             // 4bpp 完整中文字库（7415 汉字）
-LV_FONT_DECLARE(font_noto_sans_basic_14_1);  // 1bpp 字体，单色屏上小细节不会丢失
-LV_FONT_DECLARE(font_noto_sans_basic_20_4);
+LV_FONT_DECLARE(font_puhui_16_4);             // 4bpp 完整中文字库（7415 汉字），统一使用
 LV_FONT_DECLARE(alibaba_black_64);
 
 // 状态栏图标
@@ -39,11 +37,8 @@ void CustomLcdDisplay::SetupPomodoroUI() {
     DisplayLockGuard lock(this);
 
     lv_obj_t *root = lv_screen_active();
-    const lv_font_t *font_num    = &font_puhui_16_4;
-    const lv_font_t *font_time   = &font_noto_sans_basic_20_4;
+    const lv_font_t *font_sm     = &font_puhui_16_4;   // 统一使用小智完整字库
     const lv_font_t *font_big    = &alibaba_black_64;
-    const lv_font_t *font_cn     = &font_puhui_16_4;
-    const lv_font_t *font_sm     = &font_noto_sans_basic_14_1;  // 1bpp，单色屏上°的圆圈能正常显示
 
     const int SCR_W = 400;
     const int SCR_H = 300;
@@ -69,7 +64,7 @@ void CustomLcdDisplay::SetupPomodoroUI() {
 
     // 左上角时钟
     pomo_time_label_ = lv_label_create(page);
-    lv_obj_set_style_text_font(pomo_time_label_, font_time, 0);
+    lv_obj_set_style_text_font(pomo_time_label_, font_sm, 0);
     lv_obj_set_style_text_color(pomo_time_label_, lv_color_white(), 0);
     lv_obj_align(pomo_time_label_, LV_ALIGN_TOP_LEFT, 10, 5);
     lv_label_set_text(pomo_time_label_, "00:00");
@@ -102,7 +97,7 @@ void CustomLcdDisplay::SetupPomodoroUI() {
     pomo_battery_icon_img_ = lv_image_create(status_bar);
     lv_image_set_src(pomo_battery_icon_img_, &ui_img_battery_full);
     pomo_battery_pct_label_ = lv_label_create(status_bar);
-    lv_obj_set_style_text_font(pomo_battery_pct_label_, font_num, 0);
+    lv_obj_set_style_text_font(pomo_battery_pct_label_, font_sm, 0);
     lv_obj_set_style_text_color(pomo_battery_pct_label_, lv_color_black(), 0);
     lv_label_set_text(pomo_battery_pct_label_, "---%");
 
@@ -111,7 +106,7 @@ void CustomLcdDisplay::SetupPomodoroUI() {
     // ============================================================
 
     pomo_state_label_ = lv_label_create(page);
-    lv_obj_set_style_text_font(pomo_state_label_, font_cn, 0);
+    lv_obj_set_style_text_font(pomo_state_label_, font_sm, 0);
     lv_obj_set_style_text_color(pomo_state_label_, lv_color_white(), 0);
     lv_obj_set_style_text_align(pomo_state_label_, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_width(pomo_state_label_, SCR_W);
@@ -198,7 +193,7 @@ void CustomLcdDisplay::SetupPomodoroUI() {
 
     // 左侧：情绪文字标签
     pomo_emotion_label_ = lv_label_create(ai_card);
-    lv_obj_set_style_text_font(pomo_emotion_label_, font_cn, 0);
+    lv_obj_set_style_text_font(pomo_emotion_label_, font_sm, 0);
     lv_obj_set_style_text_color(pomo_emotion_label_, lv_color_black(), 0);
     lv_obj_set_style_text_align(pomo_emotion_label_, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_width(pomo_emotion_label_, emotion_w);
@@ -220,7 +215,7 @@ void CustomLcdDisplay::SetupPomodoroUI() {
     const int text_x = emotion_w + 18;
     const int text_w = ai_w - text_x - 12;
     pomo_chat_status_label_ = lv_label_create(ai_card);
-    lv_obj_set_style_text_font(pomo_chat_status_label_, font_cn, 0);
+    lv_obj_set_style_text_font(pomo_chat_status_label_, font_sm, 0);
     lv_obj_set_style_text_color(pomo_chat_status_label_, lv_color_black(), 0);
     lv_obj_set_style_text_align(pomo_chat_status_label_, LV_TEXT_ALIGN_LEFT, 0);
     lv_obj_set_width(pomo_chat_status_label_, text_w);

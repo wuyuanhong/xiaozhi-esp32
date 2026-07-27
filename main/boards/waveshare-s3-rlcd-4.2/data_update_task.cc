@@ -370,6 +370,7 @@ void CustomLcdDisplay::DataUpdateTask(void *arg) {
         // ===== 其他 UI 更新（需要重新获取锁）=====
         // 🔑 如果正在显示系统信息滚动，跳过 UI 更新（避免锁竞争）
         if (!self->showing_system_info_) {
+        {  // 锁作用域 1：UI 更新（温湿度/天气/电池/WiFi）
             DisplayLockGuard lock(self);
             static uint32_t last_noncritical_ui_update_ms = 0;
             const bool allow_noncritical_update =
@@ -522,8 +523,9 @@ void CustomLcdDisplay::DataUpdateTask(void *arg) {
                     last_wifi_state = wifi_state;
                 }
             }
+        }  // 锁作用域 1 释放 —— 股票 HTTP 在锁外执行，避免阻塞页面切换
 
-            // 7. 股票数据更新（腾讯财经 API）
+            // 7. 股票数据更新（腾讯财经 API）—— 在锁外执行 HTTP 请求
             static uint32_t stock_last_sync_ms = 0;
             static bool stock_was_visible = false;
             static bool was_trading = false;
@@ -783,6 +785,9 @@ void CustomLcdDisplay::DataUpdateTask(void *arg) {
                 }
             }
 
+        {  // 锁作用域 2：AI 状态更新（短暂持锁）
+            DisplayLockGuard lock(self);
+
             // 6. AI 状态更新
             static DeviceState last_ds = kDeviceStateUnknown;
             if (ds != last_ds) {
@@ -843,7 +848,7 @@ void CustomLcdDisplay::DataUpdateTask(void *arg) {
                 }
                 last_ds = ds;
             }
-        }  // DisplayLockGuard 自动释放
+        }  // 锁作用域 2 释放（AI 状态更新）
 
         // ===== 番茄钟 UI 刷新 =====
         // 番茄钟运行时，每秒更新倒计时显示和进度条
@@ -914,7 +919,8 @@ void CustomLcdDisplay::DataUpdateTask(void *arg) {
                 }
             }
         }
-        
+        }  // showing_system_info_ 检查结束
+
         // 动态刷新间隔：正常 1 秒，省电 5 秒
         int delay_ms = self->power_saving_ ? self->SAVING_REFRESH_MS : self->NORMAL_REFRESH_MS;
         vTaskDelay(pdMS_TO_TICKS(delay_ms));

@@ -25,10 +25,8 @@
 #include "custom_lcd_display.h"
 #include <esp_log.h>
 
-// 字体：完整中文字库 + 1bpp 小字体
-LV_FONT_DECLARE(font_puhui_16_4);             // 4bpp 完整中文字库（7415 汉字）
-LV_FONT_DECLARE(font_noto_sans_basic_14_1);   // 1bpp 字体，单色屏上小细节不会丢失
-LV_FONT_DECLARE(font_noto_sans_basic_20_4);   // 20px（用于时钟数字）
+// 字体：所有小字统一使用 font_puhui_16_4
+LV_FONT_DECLARE(font_puhui_16_4);             // 4bpp 完整中文字库（7415 汉字），统一使用
 
 // 状态栏图标
 LV_IMAGE_DECLARE(ui_img_wifi);
@@ -41,10 +39,7 @@ void CustomLcdDisplay::SetupMusicUI() {
     DisplayLockGuard lock(this);
 
     lv_obj_t *root = lv_screen_active();
-    const lv_font_t *font_num    = &font_puhui_16_4;   // 完整中文字库
-    const lv_font_t *font_time   = &font_noto_sans_basic_20_4;   // 时钟数字
-    const lv_font_t *font_cn     = &font_puhui_16_4;    // 所有中文文字统一用这个
-    const lv_font_t *font_sm     = &font_noto_sans_basic_14_1;    // 1bpp 小字，单色屏效果好
+    const lv_font_t *font_sm     = &font_puhui_16_4;   // 统一使用小智完整字库
 
     // 全局布局常量
     const int SCR_W = 400;
@@ -71,7 +66,7 @@ void CustomLcdDisplay::SetupMusicUI() {
 
     // 左上角时钟
     music_time_label_ = lv_label_create(page);
-    lv_obj_set_style_text_font(music_time_label_, font_time, 0);
+    lv_obj_set_style_text_font(music_time_label_, font_sm, 0);
     lv_obj_set_style_text_color(music_time_label_, lv_color_white(), 0);
     lv_obj_align(music_time_label_, LV_ALIGN_TOP_LEFT, 10, 5);
     lv_label_set_text(music_time_label_, "00:00");
@@ -105,7 +100,7 @@ void CustomLcdDisplay::SetupMusicUI() {
     music_battery_icon_img_ = lv_image_create(status_bar);
     lv_image_set_src(music_battery_icon_img_, &ui_img_battery_full);
     music_battery_pct_label_ = lv_label_create(status_bar);
-    lv_obj_set_style_text_font(music_battery_pct_label_, font_num, 0);
+    lv_obj_set_style_text_font(music_battery_pct_label_, font_sm, 0);
     lv_obj_set_style_text_color(music_battery_pct_label_, lv_color_black(), 0);
     lv_label_set_text(music_battery_pct_label_, "---%");
 
@@ -196,7 +191,7 @@ void CustomLcdDisplay::SetupMusicUI() {
 
     // 歌名（小智完整字库，黑字，不会缺字）
     music_title_label_ = lv_label_create(info_card);
-    lv_obj_set_style_text_font(music_title_label_, font_cn, 0);
+    lv_obj_set_style_text_font(music_title_label_, font_sm, 0);
     lv_obj_set_style_text_color(music_title_label_, lv_color_black(), 0);
     lv_obj_set_style_text_align(music_title_label_, LV_TEXT_ALIGN_LEFT, 0);
     lv_obj_set_width(music_title_label_, info_w - 24);
@@ -243,7 +238,7 @@ void CustomLcdDisplay::SetupMusicUI() {
 
     // 当前歌词（完整字库，醒目黑色，加大字号）
     music_lyric_label_ = lv_label_create(info_card);
-    lv_obj_set_style_text_font(music_lyric_label_, font_cn, 0);
+    lv_obj_set_style_text_font(music_lyric_label_, font_sm, 0);
     lv_obj_set_style_text_color(music_lyric_label_, lv_color_black(), 0);
     lv_obj_set_style_text_align(music_lyric_label_, LV_TEXT_ALIGN_LEFT, 0);
     lv_obj_set_width(music_lyric_label_, lyric_w);
@@ -334,7 +329,7 @@ void CustomLcdDisplay::SetupMusicUI() {
 
     // 左侧：情绪文字标签（下方）
     music_emotion_label_ = lv_label_create(ai_card);
-    lv_obj_set_style_text_font(music_emotion_label_, font_cn, 0);
+    lv_obj_set_style_text_font(music_emotion_label_, font_sm, 0);
     lv_obj_set_style_text_color(music_emotion_label_, lv_color_black(), 0);
     lv_obj_set_style_text_align(music_emotion_label_, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_width(music_emotion_label_, emotion_w);
@@ -356,7 +351,7 @@ void CustomLcdDisplay::SetupMusicUI() {
     const int text_x = emotion_w + 18;
     const int text_w = ai_w - text_x - 12;
     music_chat_status_label_ = lv_label_create(ai_card);
-    lv_obj_set_style_text_font(music_chat_status_label_, font_cn, 0);
+    lv_obj_set_style_text_font(music_chat_status_label_, font_sm, 0);
     lv_obj_set_style_text_color(music_chat_status_label_, lv_color_black(), 0);
     lv_obj_set_style_text_align(music_chat_status_label_, LV_TEXT_ALIGN_LEFT, 0);
     lv_obj_set_width(music_chat_status_label_, text_w);

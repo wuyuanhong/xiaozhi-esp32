@@ -13,9 +13,8 @@
 #include <esp_log.h>
 
 // 声明天气站专用字体（从 MyWeatherStation 移植，字符集有限但够天气站用）
-LV_FONT_DECLARE(font_puhui_16_4);             // 4bpp 完整中文字库（7415 汉字）
-LV_FONT_DECLARE(font_noto_sans_basic_14_1);  // 1bpp 字体，单色屏上小细节（°的圆圈）不会丢失
-LV_FONT_DECLARE(font_noto_sans_basic_20_4);
+LV_FONT_DECLARE(font_puhui_16_4);             // 4bpp 完整中文字库（7415 汉字），所有小字统一使用
+LV_FONT_DECLARE(font_noto_sans_basic_30_4);
 LV_FONT_DECLARE(alibaba_black_64);
 
 // 声明状态栏图标（从 MyWeatherStation 移植）
@@ -45,12 +44,9 @@ void CustomLcdDisplay::SetupWeatherUI() {
 
     lv_obj_t *screen = weather_page_;
 
-    const lv_font_t *font_small  = &font_noto_sans_basic_14_1;  // 1bpp，单色屏上°的圆圈能正常显示
-    const lv_font_t *font_normal = &font_noto_sans_basic_20_4;
-    const lv_font_t *font_large  = &font_noto_sans_basic_20_4;
+    const lv_font_t *font_small  = &font_puhui_16_4;  // 统一使用小智完整字库
+    const lv_font_t *font_large  = &font_noto_sans_basic_30_4;
     const lv_font_t *font_clock  = &alibaba_black_64;
-    // 小智完整字库（7415 常用汉字，AI 对话区域专用）
-    const lv_font_t *font_ai     = &font_puhui_16_4;
 
     // ===== 状态栏（右上角白底胶囊）=====
     lv_obj_t *status_bar = lv_obj_create(screen);
@@ -146,7 +142,7 @@ void CustomLcdDisplay::SetupWeatherUI() {
 
     // "TUE" 星期标签
     day_label_ = lv_label_create(calendar_card);
-    lv_obj_set_style_text_font(day_label_, font_normal, 0);
+    lv_obj_set_style_text_font(day_label_, font_small, 0);
     lv_obj_set_style_text_color(day_label_, lv_color_white(), 0);
     lv_obj_align(day_label_, LV_ALIGN_TOP_MID, 0, 8);
     lv_label_set_text(day_label_, "---");
@@ -169,9 +165,9 @@ void CustomLcdDisplay::SetupWeatherUI() {
     lv_obj_center(date_num_label_);
     lv_label_set_text(date_num_label_, "--");
 
-    // 天气标签（用 font_puhui_16_4 完整字库，支持更多城市名）
+    // 天气标签（用完整字库，支持更多城市名）
     weather_label_ = lv_label_create(calendar_card);
-    lv_obj_set_style_text_font(weather_label_, &font_puhui_16_4, 0);
+    lv_obj_set_style_text_font(weather_label_, font_small, 0);
     lv_obj_set_style_text_color(weather_label_, lv_color_white(), 0);
     lv_obj_set_style_text_align(weather_label_, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_width(weather_label_, right_w - 10);
@@ -215,7 +211,7 @@ void CustomLcdDisplay::SetupWeatherUI() {
     lv_obj_add_flag(emotion_img_, LV_OBJ_FLAG_HIDDEN);  // 初始隐藏，等 SetEmotion 设置图片
 
     emotion_label_ = lv_label_create(chat_inner);  // 父容器改为 chat_inner
-    lv_obj_set_style_text_font(emotion_label_, font_ai, 0);  // 用小智完整字库，确保所有中文都能渲染
+    lv_obj_set_style_text_font(emotion_label_, font_small, 0);  // 用小智完整字库，确保所有中文都能渲染
     lv_obj_set_style_text_color(emotion_label_, lv_color_black(), 0);
     lv_obj_set_style_text_align(emotion_label_, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_width(emotion_label_, emotion_w);
@@ -236,7 +232,7 @@ void CustomLcdDisplay::SetupWeatherUI() {
     // 右侧对话文字区
     int text_area_w = bot_card_w - emotion_w - 14 - 2 - 20;  // 减去表情区+间距+分隔线+右边距
     chat_status_label_ = lv_label_create(chat_inner);  // 🔑 父容器改为 chat_inner（关键修改）
-    lv_obj_set_style_text_font(chat_status_label_, font_ai, 0);
+    lv_obj_set_style_text_font(chat_status_label_, font_small, 0);
     lv_obj_set_style_text_color(chat_status_label_, lv_color_black(), 0);
     lv_obj_set_style_text_align(chat_status_label_, LV_TEXT_ALIGN_LEFT, 0);
     lv_obj_set_width(chat_status_label_, text_area_w);
@@ -274,7 +270,7 @@ void CustomLcdDisplay::SetupWeatherUI() {
 
     // 备忘列表（多行文字，每行一条：时间 + 内容）
     memo_list_label_ = lv_label_create(memo_card);
-    lv_obj_set_style_text_font(memo_list_label_, font_ai, 0);  // 小智完整字库
+    lv_obj_set_style_text_font(memo_list_label_, font_small, 0);  // 小智完整字库
     lv_obj_set_style_text_color(memo_list_label_, lv_color_black(), 0);
     lv_obj_set_style_text_align(memo_list_label_, LV_TEXT_ALIGN_LEFT, 0);
     lv_obj_set_width(memo_list_label_, music_card_w - 20);
@@ -326,7 +322,7 @@ void CustomLcdDisplay::SetupWeatherUI() {
     lv_obj_remove_flag(low_battery_popup_, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_flag(low_battery_popup_, LV_OBJ_FLAG_HIDDEN);
     low_battery_label_ = lv_label_create(low_battery_popup_);
-    lv_obj_set_style_text_font(low_battery_label_, font_ai, 0);
+    lv_obj_set_style_text_font(low_battery_label_, font_small, 0);
     lv_obj_set_style_text_color(low_battery_label_, lv_color_black(), 0);
     lv_obj_set_style_text_align(low_battery_label_, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_set_width(low_battery_label_, 300);
